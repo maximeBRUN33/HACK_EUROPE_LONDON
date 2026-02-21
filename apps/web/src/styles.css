@@ -226,11 +226,13 @@ button:disabled {
     radial-gradient(circle at 14% 18%, rgba(31, 78, 112, 0.28), transparent 42%),
     linear-gradient(180deg, rgba(7, 20, 32, 0.92), rgba(6, 16, 26, 0.9));
   min-height: 320px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .graph-canvas {
-  width: 100%;
+  min-width: 100%;
+  width: max-content;
   height: auto;
   display: block;
 }
@@ -267,19 +269,19 @@ button:disabled {
 }
 
 .graph-node rect {
-  fill: rgba(12, 29, 44, 0.9);
-  stroke: rgba(72, 123, 156, 0.6);
-  stroke-width: 1.5;
+  fill: rgba(22, 52, 78, 0.95);
+  stroke: rgba(94, 201, 243, 0.7);
+  stroke-width: 1.8;
 }
 
 .graph-node.node-data rect {
-  fill: rgba(10, 39, 45, 0.88);
-  stroke: rgba(95, 181, 149, 0.74);
+  fill: rgba(16, 58, 68, 0.95);
+  stroke: rgba(124, 227, 182, 0.8);
 }
 
 .graph-node.node-risk rect {
-  fill: rgba(42, 18, 17, 0.82);
-  stroke: rgba(255, 123, 95, 0.76);
+  fill: rgba(62, 28, 26, 0.95);
+  stroke: rgba(255, 138, 111, 0.85);
 }
 
 .graph-node.selected rect {

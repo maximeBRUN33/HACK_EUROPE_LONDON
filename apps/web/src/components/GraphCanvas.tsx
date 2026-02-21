@@ -9,15 +9,18 @@ type GraphCanvasProps = {
 
 type Point = { x: number; y: number };
 
-const WIDTH = 960;
+const MIN_WIDTH = 960;
 const HEIGHT = 420;
+const NODE_WIDTH = 144;
+const LAYER_GAP = 170;
+const PADDING_X = 90;
 
 export function GraphCanvas({ graph, selectedNodeId, onSelectNode }: GraphCanvasProps): JSX.Element {
-  const positions = useMemo(() => buildLayout(graph), [graph]);
+  const { positions, viewWidth } = useMemo(() => buildLayout(graph), [graph]);
 
   return (
     <div className="graph-canvas-wrap">
-      <svg className="graph-canvas" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Dependency graph canvas">
+      <svg className="graph-canvas" viewBox={`0 0 ${viewWidth} ${HEIGHT}`} role="img" aria-label="Dependency graph canvas">
         <defs>
           <marker id="arrow-control" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
             <path d="M 0 0 L 10 5 L 0 10 z" fill="#5ec9f3" />
@@ -102,12 +105,12 @@ function curvedPath(source: Point, target: Point): string {
   return `M ${source.x} ${source.y} C ${c1x} ${source.y}, ${c2x} ${target.y}, ${target.x} ${target.y}`;
 }
 
-function buildLayout(graph: GraphPayload): Map<string, Point> {
-  const points = new Map<string, Point>();
+function buildLayout(graph: GraphPayload): { positions: Map<string, Point>; viewWidth: number } {
+  const positions = new Map<string, Point>();
   const byId = new Map(graph.nodes.map((node) => [node.id, node]));
 
   if (graph.nodes.length === 0) {
-    return points;
+    return { positions, viewWidth: MIN_WIDTH };
   }
 
   const outgoing = new Map<string, string[]>();
@@ -130,22 +133,24 @@ function buildLayout(graph: GraphPayload): Map<string, Point> {
   const queue = roots.length > 0 ? [...roots] : [graph.nodes[0].id];
 
   const layerByNode = new Map<string, number>();
+  const visited = new Set<string>();
   for (const root of queue) {
     layerByNode.set(root, 0);
   }
 
   while (queue.length > 0) {
     const current = queue.shift();
-    if (!current) {
+    if (!current || visited.has(current)) {
       continue;
     }
+    visited.add(current);
     const currentLayer = layerByNode.get(current) ?? 0;
     for (const next of outgoing.get(current) ?? []) {
-      const nextLayer = currentLayer + 1;
-      if (!layerByNode.has(next) || nextLayer > (layerByNode.get(next) ?? 0)) {
-        layerByNode.set(next, nextLayer);
-      }
-      if (!queue.includes(next)) {
+      if (!visited.has(next)) {
+        const nextLayer = currentLayer + 1;
+        if (!layerByNode.has(next) || nextLayer > (layerByNode.get(next) ?? 0)) {
+          layerByNode.set(next, nextLayer);
+        }
         queue.push(next);
       }
     }
@@ -166,16 +171,17 @@ function buildLayout(graph: GraphPayload): Map<string, Point> {
   }
 
   const sortedLayers = [...layers.entries()].sort((a, b) => a[0] - b[0]);
-  const maxLayer = Math.max(...sortedLayers.map(([layer]) => layer));
+  const layerCount = sortedLayers.length;
+  const viewWidth = Math.max(MIN_WIDTH, PADDING_X * 2 + layerCount * LAYER_GAP);
 
   for (const [layer, nodes] of sortedLayers) {
-    const x = maxLayer === 0 ? WIDTH / 2 : 90 + (layer / maxLayer) * (WIDTH - 180);
+    const x = layerCount <= 1 ? viewWidth / 2 : PADDING_X + (layer / (layerCount - 1)) * (viewWidth - PADDING_X * 2);
     const verticalGap = HEIGHT / (nodes.length + 1);
     nodes.forEach((node, index) => {
       const y = (index + 1) * verticalGap;
-      points.set(node.id, { x, y });
+      positions.set(node.id, { x, y });
     });
   }
 
-  return points;
+  return { positions, viewWidth };
 }
