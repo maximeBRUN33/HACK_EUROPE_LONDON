@@ -55,6 +55,7 @@ export function App(): JSX.Element {
   const [activeTab, setActiveTab] = useState<"scan" | "process" | "data" | "risk" | "copilot">("scan");
   const [symbolNodeMap, setSymbolNodeMap] = useState<Map<string, string>>(new Map());
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
+  const [showDashboard, setShowDashboard] = useState(false);
 
   useEffect(() => {
     fetchDustStatus()
@@ -64,6 +65,16 @@ export function App(): JSX.Element {
       .then((res) => setCodewordsConfigured("CodeWords" in (res.servers || {})))
       .catch(() => setCodewordsConfigured(false));
   }, []);
+
+  const hasCompletedRun = state.run?.status === "completed";
+
+  // Trigger light→dark transition after run completes
+  useEffect(() => {
+    if (hasCompletedRun && !showDashboard) {
+      const timer = setTimeout(() => setShowDashboard(true), 80);
+      return () => clearTimeout(timer);
+    }
+  }, [hasCompletedRun, showDashboard]);
 
   async function handleStart(repoUrl: string, commitSha: string, localPath: string): Promise<{ repo: RepoResponse; run: RunResponse }> {
     setBusy(true);
@@ -192,45 +203,58 @@ export function App(): JSX.Element {
     return `${state.repo.owner}/${state.repo.name} | ${state.run.commit_sha} | ${state.run.status} | ${state.run.current_step} | ${progress} | ${mode}`;
   }, [state.repo, state.run]);
 
+  if (!showDashboard) {
+    return (
+      <div className="app-shell app-shell-light">
+        <RepoIntakePanel
+          isBusy={busy}
+          run={state.run}
+          dustConfigured={dustConfigured}
+          codewordsConfigured={codewordsConfigured}
+          onStart={handleStart}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="app-shell">
-      <header>
+    <div className="app-shell app-shell-dark app-shell-enter">
+      <header className="header-compact">
         <h1>Legacy Atlas</h1>
-        <p>AI-powered legacy comprehension with process maps, lineage tracing, and risk intelligence.</p>
-        <div className={`run-pill ${state.run ? `run-pill-${state.run.status}` : ""}`}>{runSummary}</div>
+        <div className={`run-pill run-pill-${state.run!.status}`}>{runSummary}</div>
+        <button className="new-analysis-btn" onClick={() => { setState(initialState); setShowDashboard(false); setActiveTab("scan"); }}>
+          New Analysis &rarr;
+        </button>
       </header>
 
-      {state.run?.status === "completed" && (
-        <div className="kpi-bar">
-          <div className="kpi-item">
-            <span className="kpi-label">Files Analyzed</span>
-            <span className="kpi-value">{String(state.run.summary?.files_scanned ?? 0)}</span>
-          </div>
-          <div className="kpi-divider" />
-          <div className="kpi-item">
-            <span className="kpi-label">Workflow Nodes</span>
-            <span className="kpi-value">{state.workflowGraph?.nodes.length ?? 0}</span>
-          </div>
-          <div className="kpi-divider" />
-          <div className="kpi-item">
-            <span className="kpi-label">Data Entities</span>
-            <span className="kpi-value">{state.lineageGraph?.nodes.length ?? 0}</span>
-          </div>
-          <div className="kpi-divider" />
-          <div className="kpi-item">
-            <span className="kpi-label">Risk Findings</span>
-            <span className="kpi-value">{state.riskSummary?.findings.length ?? 0}</span>
-          </div>
-          <div className="kpi-divider" />
-          <div className="kpi-item">
-            <span className="kpi-label">Analysis Mode</span>
-            <span className="kpi-value kpi-mode">{String(state.run.summary?.analysis_mode ?? "N/A")}</span>
-          </div>
+      <div className="kpi-bar">
+        <div className="kpi-item">
+          <span className="kpi-label">Files Analyzed</span>
+          <span className="kpi-value">{String(state.run!.summary?.files_scanned ?? 0)}</span>
         </div>
-      )}
+        <div className="kpi-divider" />
+        <div className="kpi-item">
+          <span className="kpi-label">Workflow Nodes</span>
+          <span className="kpi-value">{state.workflowGraph?.nodes.length ?? 0}</span>
+        </div>
+        <div className="kpi-divider" />
+        <div className="kpi-item">
+          <span className="kpi-label">Data Entities</span>
+          <span className="kpi-value">{state.lineageGraph?.nodes.length ?? 0}</span>
+        </div>
+        <div className="kpi-divider" />
+        <div className="kpi-item">
+          <span className="kpi-label">Risk Findings</span>
+          <span className="kpi-value">{state.riskSummary?.findings.length ?? 0}</span>
+        </div>
+        <div className="kpi-divider" />
+        <div className="kpi-item">
+          <span className="kpi-label">Analysis Mode</span>
+          <span className="kpi-value kpi-mode">{String(state.run!.summary?.analysis_mode ?? "N/A")}</span>
+        </div>
+      </div>
 
       <nav className="tab-bar">
-        <button className={`tab-btn ${activeTab === "scan" ? "active" : ""}`} onClick={() => setActiveTab("scan")}>Scan</button>
         <button className={`tab-btn ${activeTab === "process" ? "active" : ""}`} onClick={() => setActiveTab("process")}>Process Explorer</button>
         <button className={`tab-btn ${activeTab === "data" ? "active" : ""}`} onClick={() => setActiveTab("data")}>Data Lineage</button>
         <button className={`tab-btn ${activeTab === "risk" ? "active" : ""}`} onClick={() => setActiveTab("risk")}>Risk Analysis</button>
@@ -238,16 +262,6 @@ export function App(): JSX.Element {
       </nav>
 
       <main>
-        {activeTab === "scan" && (
-          <RepoIntakePanel
-            isBusy={busy}
-            run={state.run}
-            dustConfigured={dustConfigured}
-            codewordsConfigured={codewordsConfigured}
-            onStart={handleStart}
-          />
-        )}
-
         {activeTab === "process" && (
           <GraphPanel
             title="Process Atlas"
