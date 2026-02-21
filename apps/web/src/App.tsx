@@ -6,8 +6,10 @@ import { RiskPanel } from "./components/RiskPanel";
 import {
   askCopilot,
   fetchDustStatus,
+  fetchIntegrationsReadiness,
   fetchLineageGraph,
   fetchMcpStatus,
+  fetchMigrationBlueprint,
   fetchNodeEvidence,
   fetchRiskSummary,
   fetchRunEnrichment,
@@ -19,6 +21,8 @@ import {
   type EnrichmentPayload,
   type EvidencePayload,
   type GraphPayload,
+  type IntegrationsReadinessResponse,
+  type MigrationBlueprintPayload,
   type RepoResponse,
   type RiskSummary,
   type RunResponse
@@ -60,6 +64,9 @@ export function App(): JSX.Element {
   const [symbolNodeMap, setSymbolNodeMap] = useState<Map<string, string>>(new Map());
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [integrationsReadiness, setIntegrationsReadiness] = useState<IntegrationsReadinessResponse | null>(null);
+  const [migrationBlueprint, setMigrationBlueprint] = useState<MigrationBlueprintPayload | null>(null);
+  const [blueprintLoading, setBlueprintLoading] = useState(false);
 
   useEffect(() => {
     fetchDustStatus()
@@ -68,6 +75,9 @@ export function App(): JSX.Element {
     fetchMcpStatus()
       .then((res) => setCodewordsConfigured("CodeWords" in (res.servers || {})))
       .catch(() => setCodewordsConfigured(false));
+    fetchIntegrationsReadiness()
+      .then(setIntegrationsReadiness)
+      .catch(() => setIntegrationsReadiness(null));
   }, []);
 
   const hasCompletedRun = state.run?.status === "completed";
@@ -91,12 +101,15 @@ export function App(): JSX.Element {
         setState((current) => ({ ...current, run }));
       });
 
-      const [workflowGraph, lineageGraph, riskSummary, enrichment] = await Promise.all([
+      const [workflowGraph, lineageGraph, riskSummary, enrichment, blueprint] = await Promise.all([
         fetchWorkflowGraph(completedRun.id),
         fetchLineageGraph(completedRun.id),
         fetchRiskSummary(completedRun.id),
-        fetchRunEnrichment(completedRun.id).catch(() => null)
+        fetchRunEnrichment(completedRun.id).catch(() => null),
+        fetchMigrationBlueprint(completedRun.id).catch(() => null)
       ]);
+
+      setMigrationBlueprint(blueprint);
 
       setState((current) => ({
         ...current,
@@ -177,6 +190,17 @@ export function App(): JSX.Element {
     ).then(() => setSymbolNodeMap(new Map(map)));
   }, [state.workflowGraph]);
 
+  // Fetch migration blueprint when Risk tab is opened (if not already fetched at completion)
+  useEffect(() => {
+    if (activeTab === "risk" && state.run?.status === "completed" && !migrationBlueprint && !blueprintLoading) {
+      setBlueprintLoading(true);
+      fetchMigrationBlueprint(state.run.id)
+        .then(setMigrationBlueprint)
+        .catch(() => setMigrationBlueprint(null))
+        .finally(() => setBlueprintLoading(false));
+    }
+  }, [activeTab, state.run, migrationBlueprint, blueprintLoading]);
+
   const handleFocusNode = useCallback(
     (nodeId: string) => {
       setActiveTab("process");
@@ -228,7 +252,24 @@ export function App(): JSX.Element {
       <header className="header-compact">
         <h1>Legacy Atlas</h1>
         <div className={`run-pill run-pill-${state.run!.status}`}>{runSummary}</div>
-        <button className="new-analysis-btn" onClick={() => { setState(initialState); setShowDashboard(false); setActiveTab("scan"); }}>
+        <div className="header-badges">
+          {(["dust", "codewords", "mcp"] as const).map((key) => {
+            const provider = integrationsReadiness?.[key === "codewords" ? "codewords" : key === "dust" ? "dust" : "mcp"];
+            const label = key === "codewords" ? "CodeWords" : key === "dust" ? "Dust" : "MCP";
+            const cls = provider?.configured && provider?.reachable ? "int-ok" : provider?.configured ? "int-warn" : "int-off";
+            const icon = provider?.configured && provider?.reachable ? "\u2713" : provider?.configured ? "!" : "\u2717";
+            const tooltip = provider?.configured && provider?.reachable
+              ? `Connected${provider.latency_ms != null ? ` \u2014 ${provider.latency_ms}ms` : ""}`
+              : provider?.configured
+                ? `Configured but not reachable${provider.detail ? ` \u2014 ${provider.detail}` : ""}`
+                : "Not configured";
+            return <span key={key} className={`int-badge ${cls}`} title={tooltip}>{label} {icon}</span>;
+          })}
+          {state.enrichment && state.enrichment.status === "completed" && (
+            <span className="int-badge int-ok">AI Enriched {"\u2713"}</span>
+          )}
+        </div>
+        <button className="new-analysis-btn" onClick={() => { setState(initialState); setShowDashboard(false); setActiveTab("scan"); setMigrationBlueprint(null); }}>
           New Analysis &rarr;
         </button>
       </header>
@@ -260,20 +301,22 @@ export function App(): JSX.Element {
         </div>
       </div>
 
-      <nav className="tab-bar">
-        <button className={`tab-btn ${activeTab === "process" ? "active" : ""}`} onClick={() => setActiveTab("process")}>Process Explorer</button>
-        <button className={`tab-btn ${activeTab === "data" ? "active" : ""}`} onClick={() => setActiveTab("data")}>Data Lineage</button>
-        <button className={`tab-btn ${activeTab === "risk" ? "active" : ""}`} onClick={() => setActiveTab("risk")}>Risk Analysis</button>
-        <button className={`tab-btn ${activeTab === "copilot" ? "active" : ""}`} onClick={() => setActiveTab("copilot")}>Copilot</button>
-      </nav>
-      <p className="tab-description">
-        {activeTab === "process" && "How your codebase\u2019s business workflows connect and flow"}
-        {activeTab === "data" && "How data entities move across modules in your system"}
-        {activeTab === "risk" && "Where complexity and technical debt create migration risk"}
-        {activeTab === "copilot" && "Ask questions about the codebase and get cited answers"}
-      </p>
+      <div className="tab-nav-card">
+        <nav className="tab-bar">
+          <button className={`tab-btn ${activeTab === "process" ? "active" : ""}`} onClick={() => setActiveTab("process")}>Process Explorer</button>
+          <button className={`tab-btn ${activeTab === "data" ? "active" : ""}`} onClick={() => setActiveTab("data")}>Data Lineage</button>
+          <button className={`tab-btn ${activeTab === "risk" ? "active" : ""}`} onClick={() => setActiveTab("risk")}>Risk Analysis</button>
+          <button className={`tab-btn ${activeTab === "copilot" ? "active" : ""}`} onClick={() => setActiveTab("copilot")}>Copilot</button>
+        </nav>
+        <p className="tab-description">
+          {activeTab === "process" && "How business operations flow through the system. Click any step to see the source code evidence behind it."}
+          {activeTab === "data" && "How business data (customers, orders, invoices) moves across modules. Reveals sensitive handoffs and integration pressure points."}
+          {activeTab === "risk" && "Where change is most dangerous and why. Prioritized by impact and failure likelihood, with migration recommendations."}
+          {activeTab === "copilot" && "Ask questions about the codebase and get answers backed by source code evidence."}
+        </p>
+      </div>
 
-      <main>
+      <main className="tab-content-card">
         {activeTab === "process" && (
           <GraphPanel
             title="Process Atlas"
@@ -284,6 +327,7 @@ export function App(): JSX.Element {
             focusedNodeId={focusedNodeId}
             riskSummary={state.riskSummary}
             enrichment={state.enrichment}
+            graphMode="process"
           />
         )}
 
@@ -296,6 +340,7 @@ export function App(): JSX.Element {
             onSelectNode={handleSelectLineageNode}
             showEdgeLabels
             riskSummary={state.riskSummary}
+            graphMode="lineage"
           />
         )}
 
@@ -310,8 +355,9 @@ export function App(): JSX.Element {
               riskOverlay
               focusedNodeId={focusedNodeId}
               riskSummary={state.riskSummary}
+              graphMode="process"
             />
-            <RiskPanel summary={state.riskSummary} enrichment={state.enrichment} />
+            <RiskPanel summary={state.riskSummary} enrichment={state.enrichment} migrationBlueprint={migrationBlueprint} blueprintLoading={blueprintLoading} />
           </>
         )}
 

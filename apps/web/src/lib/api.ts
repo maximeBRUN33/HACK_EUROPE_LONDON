@@ -104,7 +104,7 @@ export type MigrationBlueprintPayload = {
   run_id: string;
   analysis_mode: string;
   readiness_score: number;
-  readiness_band: "low" | "medium" | "high";
+  readiness_band: string;
   entities: string[];
   impacted_modules: string[];
   extraction_boundaries: Array<Record<string, unknown>>;
@@ -215,7 +215,18 @@ export async function fetchIntegrationsReadiness(): Promise<IntegrationsReadines
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Request failed (${response.status})`);
+    let message = `Request failed (${response.status})`;
+    try {
+      const body = await response.json();
+      if (body?.detail?.detail_code) {
+        message = `${body.detail.detail_code}: ${body.detail.message ?? message}`;
+      } else if (typeof body?.detail === "string") {
+        message = body.detail;
+      }
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(message);
   }
   return response.json();
 }
