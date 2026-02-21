@@ -7,7 +7,6 @@ type GraphCanvasProps = {
   onSelectNode: (nodeId: string) => void;
   nodeDisplayNames?: Map<string, string>;
   nodeSubtitles?: Map<string, string>;
-  riskOverlay?: boolean;
   showEdgeLabels?: boolean;
 };
 
@@ -19,7 +18,7 @@ const LAYER_GAP_Y = 110;
 const NODE_GAP_X = 40;
 const PADDING = 80;
 
-export function GraphCanvas({ graph, selectedNodeId, onSelectNode, nodeDisplayNames, nodeSubtitles, riskOverlay, showEdgeLabels }: GraphCanvasProps): JSX.Element {
+export function GraphCanvas({ graph, selectedNodeId, onSelectNode, nodeDisplayNames, nodeSubtitles, showEdgeLabels }: GraphCanvasProps): JSX.Element {
   const { positions, viewWidth, viewHeight } = useMemo(() => buildLayout(graph), [graph]);
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<{ startX: number; startY: number; startPanX: number; startPanY: number } | null>(null);
@@ -202,12 +201,13 @@ export function GraphCanvas({ graph, selectedNodeId, onSelectNode, nodeDisplayNa
           }
 
           const isSelected = selectedNodeId === node.id;
-          const riskClass = riskOverlay ? riskLevelClass(node.risk_score) : "";
           const riskColor = riskScoreColor(node.risk_score);
+          const nodeStyle = riskNodeStyle(node.risk_score);
+          const borderColor = isSelected ? "#2563EB" : nodeStyle.border;
           return (
             <g
               key={node.id}
-              className={`graph-node node-${node.node_type} ${isSelected ? "selected" : ""} ${riskClass}`}
+              className={`graph-node node-${node.node_type} ${isSelected ? "selected" : ""}`}
               transform={`translate(${point.x}, ${point.y})`}
               role="button"
               tabIndex={0}
@@ -219,7 +219,8 @@ export function GraphCanvas({ graph, selectedNodeId, onSelectNode, nodeDisplayNa
                 }
               }}
             >
-              <rect x={-halfW} y={-halfH} rx={12} ry={12} width={NODE_WIDTH} height={NODE_HEIGHT} />
+              <rect x={-halfW} y={-halfH} rx={12} ry={12} width={NODE_WIDTH} height={NODE_HEIGHT} fill={nodeStyle.fill} stroke={isSelected ? "#2563EB" : "#E5E7EB"} strokeWidth={isSelected ? 2 : 1} />
+              <rect x={-halfW} y={-halfH + 4} width={4} height={NODE_HEIGHT - 8} rx={2} fill={borderColor} />
               <circle cx={halfW - 18} cy={0} r={7} fill={riskColor} opacity={0.85} />
               <text className="node-label" x={-halfW + 16} y={-6} textAnchor="start">
                 {truncate(nodeDisplayNames?.get(node.id) ?? humanizeLabel(node.label), 30)}
@@ -290,16 +291,17 @@ function truncate(value: string, max: number): string {
   return `${value.slice(0, max - 3)}...`;
 }
 
-function riskLevelClass(score: number): string {
-  if (score > 70) return "risk-high";
-  if (score >= 50) return "risk-medium";
-  return "risk-low";
-}
-
 function riskScoreColor(score: number): string {
   if (score > 70) return "#EF4444";
   if (score >= 50) return "#F59E0B";
   return "#22C55E";
+}
+
+function riskNodeStyle(score: number): { fill: string; border: string } {
+  if (score > 70) return { fill: "#FEF2F2", border: "#EF4444" };
+  if (score > 50) return { fill: "#FFF7ED", border: "#FB923C" };
+  if (score >= 30) return { fill: "#FFFBEB", border: "#F59E0B" };
+  return { fill: "#F0FDF4", border: "#22C55E" };
 }
 
 function verticalCurvedPath(source: Point, target: Point): string {

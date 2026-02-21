@@ -10,7 +10,6 @@ type GraphPanelProps = {
   evidenceLoading: boolean;
   onSelectNode: (nodeId: string) => void;
   focusedNodeId?: string | null;
-  riskOverlay?: boolean;
   showEdgeLabels?: boolean;
   riskSummary?: RiskSummary | null;
   enrichment?: EnrichmentPayload | null;
@@ -42,7 +41,7 @@ function extractCrudOps(explanation: string): string[] {
   return ops;
 }
 
-export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNode, focusedNodeId, riskOverlay, showEdgeLabels, riskSummary, enrichment, graphMode }: GraphPanelProps): JSX.Element {
+export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNode, focusedNodeId, showEdgeLabels, riskSummary, enrichment, graphMode }: GraphPanelProps): JSX.Element {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [nodeDisplayNames, setNodeDisplayNames] = useState<Map<string, string>>(new Map());
   const [nodeSubtitles, setNodeSubtitles] = useState<Map<string, string>>(new Map());
@@ -198,7 +197,7 @@ export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNo
               </div>
             </div>
 
-            <GraphCanvas graph={graph} selectedNodeId={selectedNode?.id ?? null} onSelectNode={setSelectedNodeId} nodeDisplayNames={nodeDisplayNames} nodeSubtitles={nodeSubtitles} riskOverlay={riskOverlay} showEdgeLabels={showEdgeLabels} />
+            <GraphCanvas graph={graph} selectedNodeId={selectedNode?.id ?? null} onSelectNode={setSelectedNodeId} nodeDisplayNames={nodeDisplayNames} nodeSubtitles={nodeSubtitles} showEdgeLabels={showEdgeLabels} />
 
             {graphMode && (
               <div className="graph-legend-wrap">
