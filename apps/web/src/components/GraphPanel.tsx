@@ -14,6 +14,7 @@ type GraphPanelProps = {
   showEdgeLabels?: boolean;
   riskSummary?: RiskSummary | null;
   enrichment?: EnrichmentPayload | null;
+  graphMode?: "process" | "lineage";
 };
 
 function humanizeLabel(label: string): string {
@@ -29,9 +30,11 @@ function humanizeLabel(label: string): string {
   return words.join(" ");
 }
 
-export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNode, focusedNodeId, riskOverlay, showEdgeLabels, riskSummary, enrichment }: GraphPanelProps): JSX.Element {
+export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNode, focusedNodeId, riskOverlay, showEdgeLabels, riskSummary, enrichment, graphMode }: GraphPanelProps): JSX.Element {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [nodeSubtitles, setNodeSubtitles] = useState<Map<string, string>>(new Map());
+  const [showLegend, setShowLegend] = useState(false);
+  const [showNodeInfo, setShowNodeInfo] = useState(false);
 
   useEffect(() => {
     if (focusedNodeId) {
@@ -144,6 +147,32 @@ export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNo
             </div>
 
             <GraphCanvas graph={graph} selectedNodeId={selectedNode?.id ?? null} onSelectNode={setSelectedNodeId} nodeSubtitles={nodeSubtitles} riskOverlay={riskOverlay} showEdgeLabels={showEdgeLabels} />
+
+            {graphMode && (
+              <div className="graph-legend-wrap">
+                <button className="legend-toggle" onClick={() => setShowLegend(!showLegend)}>
+                  {showLegend ? "Hide legend" : "Show legend"}
+                </button>
+                {showLegend && (
+                  <div className="graph-legend">
+                    {graphMode === "process" && (
+                      <>
+                        <div className="legend-item"><span className="legend-dot legend-dot-process" /> Process Node &mdash; a meaningful execution step</div>
+                        <div className="legend-item"><span className="legend-dot legend-dot-risk" /> Risk Node &mdash; a high-risk hotspot or aggregation point</div>
+                        <div className="legend-item"><span className="legend-line legend-line-control" /> Control Edge &mdash; execution relationship between steps</div>
+                        <div className="legend-item"><span className="legend-line legend-line-risk" /> Risk Edge &mdash; risk linkage to process areas</div>
+                      </>
+                    )}
+                    {graphMode === "lineage" && (
+                      <>
+                        <div className="legend-item"><span className="legend-dot legend-dot-data" /> Entity Node &mdash; a business data object (e.g., Customer, Order)</div>
+                        <div className="legend-item"><span className="legend-line legend-line-data" /> Data Edge &mdash; inferred data movement between entities</div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {selectedNode && (
@@ -152,6 +181,19 @@ export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNo
               <div className="detail-badges">
                 <span className={`node-pill ${selectedNode.node_type}`}>{selectedNode.node_type}</span>
               </div>
+
+              {graphMode === "process" && (
+                <div className="node-info-toggle-wrap">
+                  <button className="node-info-toggle" onClick={() => setShowNodeInfo(!showNodeInfo)}>
+                    {showNodeInfo ? "Hide explanation" : "What is this?"}
+                  </button>
+                  {showNodeInfo && (
+                    <p className="node-info-text">
+                      A workflow node represents a key business-relevant step extracted from code execution analysis. It is selected from top-ranked functions based on complexity, call patterns, and entity signals.
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="detail-section">
                 <span className="detail-section-label">Risk Score</span>
