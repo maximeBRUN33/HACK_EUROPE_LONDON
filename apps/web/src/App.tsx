@@ -52,6 +52,9 @@ export function App(): JSX.Element {
   const [lineageEvidenceLoading, setLineageEvidenceLoading] = useState(false);
   const [dustConfigured, setDustConfigured] = useState(false);
   const [codewordsConfigured, setCodewordsConfigured] = useState(false);
+  const [activeTab, setActiveTab] = useState<"scan" | "process" | "data" | "risk" | "copilot">("scan");
+  const [symbolNodeMap, setSymbolNodeMap] = useState<Map<string, string>>(new Map());
+  const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDustStatus()
@@ -90,6 +93,8 @@ export function App(): JSX.Element {
         riskSummary,
         copilot: null
       }));
+
+      setActiveTab("process");
 
       return { repo, run: completedRun };
     } finally {
@@ -133,6 +138,37 @@ export function App(): JSX.Element {
     [state.run]
   );
 
+  // Build symbol → nodeId map from workflow graph evidence
+  useEffect(() => {
+    if (!state.workflowGraph || state.workflowGraph.nodes.length === 0) {
+      setSymbolNodeMap(new Map());
+      return;
+    }
+    const runId = state.workflowGraph.run_id;
+    const map = new Map<string, string>();
+    Promise.all(
+      state.workflowGraph.nodes.map(async (node) => {
+        try {
+          const ev = await fetchNodeEvidence(runId, node.id);
+          for (const sym of ev.symbols) {
+            map.set(sym, node.id);
+          }
+        } catch {
+          // skip
+        }
+      })
+    ).then(() => setSymbolNodeMap(new Map(map)));
+  }, [state.workflowGraph]);
+
+  const handleFocusNode = useCallback(
+    (nodeId: string) => {
+      setActiveTab("process");
+      setFocusedNodeId(nodeId);
+      handleSelectWorkflowNode(nodeId);
+    },
+    [handleSelectWorkflowNode]
+  );
+
   async function handleAsk(question: string): Promise<void> {
     if (!state.run) {
       return;
@@ -164,36 +200,97 @@ export function App(): JSX.Element {
         <div className={`run-pill ${state.run ? `run-pill-${state.run.status}` : ""}`}>{runSummary}</div>
       </header>
 
-      <main>
-        <RepoIntakePanel
-          isBusy={busy}
-          run={state.run}
-          dustConfigured={dustConfigured}
-          codewordsConfigured={codewordsConfigured}
-          onStart={handleStart}
-        />
+      {state.run?.status === "completed" && (
+        <div className="kpi-bar">
+          <div className="kpi-item">
+            <span className="kpi-label">Files Analyzed</span>
+            <span className="kpi-value">{String(state.run.summary?.files_scanned ?? 0)}</span>
+          </div>
+          <div className="kpi-divider" />
+          <div className="kpi-item">
+            <span className="kpi-label">Workflow Nodes</span>
+            <span className="kpi-value">{state.workflowGraph?.nodes.length ?? 0}</span>
+          </div>
+          <div className="kpi-divider" />
+          <div className="kpi-item">
+            <span className="kpi-label">Data Entities</span>
+            <span className="kpi-value">{state.lineageGraph?.nodes.length ?? 0}</span>
+          </div>
+          <div className="kpi-divider" />
+          <div className="kpi-item">
+            <span className="kpi-label">Risk Findings</span>
+            <span className="kpi-value">{state.riskSummary?.findings.length ?? 0}</span>
+          </div>
+          <div className="kpi-divider" />
+          <div className="kpi-item">
+            <span className="kpi-label">Analysis Mode</span>
+            <span className="kpi-value kpi-mode">{String(state.run.summary?.analysis_mode ?? "N/A")}</span>
+          </div>
+        </div>
+      )}
 
-        <section className="grid two-col">
+      <nav className="tab-bar">
+        <button className={`tab-btn ${activeTab === "scan" ? "active" : ""}`} onClick={() => setActiveTab("scan")}>Scan</button>
+        <button className={`tab-btn ${activeTab === "process" ? "active" : ""}`} onClick={() => setActiveTab("process")}>Process Explorer</button>
+        <button className={`tab-btn ${activeTab === "data" ? "active" : ""}`} onClick={() => setActiveTab("data")}>Data Lineage</button>
+        <button className={`tab-btn ${activeTab === "risk" ? "active" : ""}`} onClick={() => setActiveTab("risk")}>Risk Analysis</button>
+        <button className={`tab-btn ${activeTab === "copilot" ? "active" : ""}`} onClick={() => setActiveTab("copilot")}>Copilot</button>
+      </nav>
+
+      <main>
+        {activeTab === "scan" && (
+          <RepoIntakePanel
+            isBusy={busy}
+            run={state.run}
+            dustConfigured={dustConfigured}
+            codewordsConfigured={codewordsConfigured}
+            onStart={handleStart}
+          />
+        )}
+
+        {activeTab === "process" && (
           <GraphPanel
             title="Process Atlas"
             graph={state.workflowGraph}
             evidence={state.workflowEvidence}
             evidenceLoading={workflowEvidenceLoading}
             onSelectNode={handleSelectWorkflowNode}
+            focusedNodeId={focusedNodeId}
+            riskSummary={state.riskSummary}
           />
+        )}
+
+        {activeTab === "data" && (
           <GraphPanel
             title="Data Lineage Navigator"
             graph={state.lineageGraph}
             evidence={state.lineageEvidence}
             evidenceLoading={lineageEvidenceLoading}
             onSelectNode={handleSelectLineageNode}
+            showEdgeLabels
+            riskSummary={state.riskSummary}
           />
-        </section>
+        )}
 
-        <section className="grid two-col">
-          <RiskPanel summary={state.riskSummary} />
-          <CopilotPanel runId={state.run?.id ?? null} response={state.copilot} isBusy={copilotBusy} onAsk={handleAsk} />
-        </section>
+        {activeTab === "risk" && (
+          <>
+            <GraphPanel
+              title="Risk Atlas"
+              graph={state.workflowGraph}
+              evidence={state.workflowEvidence}
+              evidenceLoading={workflowEvidenceLoading}
+              onSelectNode={handleSelectWorkflowNode}
+              riskOverlay
+              focusedNodeId={focusedNodeId}
+              riskSummary={state.riskSummary}
+            />
+            <RiskPanel summary={state.riskSummary} />
+          </>
+        )}
+
+        {activeTab === "copilot" && (
+          <CopilotPanel runId={state.run?.id ?? null} response={state.copilot} isBusy={copilotBusy} onAsk={handleAsk} onFocusNode={handleFocusNode} symbolNodeMap={symbolNodeMap} />
+        )}
       </main>
     </div>
   );
