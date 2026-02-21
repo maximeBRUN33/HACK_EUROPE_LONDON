@@ -11,7 +11,6 @@ type Point = { x: number; y: number };
 
 const MIN_WIDTH = 960;
 const HEIGHT = 420;
-const NODE_WIDTH = 144;
 const LAYER_GAP = 170;
 const PADDING_X = 90;
 
