@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import logging
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -28,6 +29,7 @@ class CodeWordsClient:
             header = cw_server.get("headers", {}).get("Authorization", "")
             if isinstance(header, str) and header.lower().startswith("bearer "):
                 self.api_key = header.split(" ", 1)[1].strip()
+        self.logger = logging.getLogger(__name__)
 
     def is_configured(self) -> bool:
         return bool(self.base_url and self.api_key)
@@ -35,6 +37,7 @@ class CodeWordsClient:
     def trigger(self, service_id: str, inputs: dict, async_mode: bool = True) -> CodeWordsResponse:
         if not self.is_configured():
             raise RuntimeError("CodeWords runtime not configured")
+        self.logger.info("CodeWords trigger start service_id=%s async=%s", service_id, async_mode)
 
         route = "run_async" if async_mode else "run"
         base_url = f"{self.base_url}/{route}/{service_id}"
@@ -50,6 +53,7 @@ class CodeWordsClient:
             if not needs_inputs_wrapper:
                 raise
             # Compatibility format for services that expect {"inputs": {...}}.
+            self.logger.info("CodeWords trigger retrying with inputs wrapper service_id=%s", service_id)
             raw = self._post_json(url, {"inputs": inputs})
 
         request_id = (
@@ -63,15 +67,18 @@ class CodeWordsClient:
         if async_mode and request_id and status == "completed":
             status = "queued"
 
+        self.logger.info("CodeWords trigger done service_id=%s status=%s request_id=%s", service_id, status, request_id)
         return CodeWordsResponse(status=status, request_id=request_id, raw=raw)
 
     def poll_result(self, request_id: str) -> CodeWordsResponse:
         if not self.is_configured():
             raise RuntimeError("CodeWords runtime not configured")
+        self.logger.info("CodeWords poll start request_id=%s", request_id)
 
         url = f"{self.base_url}/result/{request_id}"
         raw = self._get_json(url)
         status = _infer_status(raw)
+        self.logger.info("CodeWords poll done request_id=%s status=%s", request_id, status)
         return CodeWordsResponse(status=status, request_id=request_id, raw=raw)
 
     def _post_json(self, url: str, payload: dict) -> dict:

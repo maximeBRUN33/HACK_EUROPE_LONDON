@@ -9,6 +9,8 @@ pip install -e .
 uvicorn app.main:app --reload --port 8000
 ```
 
+The API auto-loads variables from `apps/api/.env` at startup (existing shell env vars still take precedence).
+
 ## Endpoints
 
 - `POST /api/repos/register`
@@ -44,9 +46,20 @@ If no local path is available, the API returns fallback synthetic artifacts.
 - `LEGACY_ATLAS_REPO_CACHE`: repository clone cache path.
 - `LEGACY_ATLAS_ENABLE_GIT_INGESTION`: `1` (default) to allow clone/fetch, `0` to disable.
 - `LEGACY_ATLAS_SYNC_JOBS`: `1` to execute scans inline (test mode).
+- `LEGACY_ATLAS_LOG_LEVEL`: runtime logging level (`DEBUG`, `INFO`, `WARNING`, ...).
+- `LEGACY_ATLAS_AST_PROGRESS_EVERY`: log AST parser progress every N scanned Python files.
 - `CODEWORDS_RUNTIME_BASE_URL`: defaults to MCP CodeWords URL when available.
 - `CODEWORDS_API_KEY`: overrides MCP token fallback.
 - `DUST_API_BASE_URL`: defaults to `https://dust.tt/api/v1`.
 - `DUST_WORKSPACE_ID`: required for Dust semantic copilot mode.
 - `DUST_API_KEY`: required for Dust semantic copilot mode.
 - `DUST_ASSISTANT_CONFIGURATION_ID`: required Dust assistant id for mentions.
+
+## Real-time logs
+
+```bash
+cd apps/api
+LEGACY_ATLAS_LOG_LEVEL=DEBUG uvicorn app.main:app --reload --port 8000
+```
+
+This will print run lifecycle logs (ingestion, AST parsing, graph/risk build, artifact persistence, Dust/CodeWords calls) directly in terminal.

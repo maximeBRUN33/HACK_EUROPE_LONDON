@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import logging
 from collections import Counter
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -19,6 +20,7 @@ from app.services.python_ast import (
 from app.store import store
 
 ENTRYPOINT_HINTS = ("confirm", "submit", "process", "assign", "post", "create", "run", "execute")
+logger = logging.getLogger(__name__)
 
 MIGRATION_SUGGESTIONS: dict[str, list[str]] = {
     "complexity": [
@@ -424,6 +426,14 @@ def run_static_analysis(
     repo: Repository,
     progress_cb: Callable[[str, float], None] | None = None,
 ) -> AnalysisRun:
+    logger.info(
+        "Starting static analysis run_id=%s repo=%s/%s commit=%s",
+        run.id,
+        repo.owner,
+        repo.name,
+        run.commit_sha,
+    )
+
     def update_progress(step: str, pct: float) -> None:
         if progress_cb is not None:
             progress_cb(step, pct)
@@ -436,10 +446,21 @@ def run_static_analysis(
 
     repo_root = _resolve_repo_root(repo)
     if repo_root:
+        logger.info("Resolved repository source run_id=%s mode=ast-local path=%s", run.id, repo_root)
         run.current_step = "parsing-python-ast"
         run.progress_pct = 35.0
         update_progress("parsing-python-ast", 35.0)
         parsed = analyze_python_repository(repo_root)
+        logger.info(
+            "AST parse completed run_id=%s files=%s functions=%s parse_errors=%s",
+            run.id,
+            parsed.files_scanned,
+            len(parsed.functions),
+            len(parsed.parse_errors),
+        )
+        if parsed.parse_errors:
+            logger.warning("AST parse had syntax errors run_id=%s sample=%s", run.id, parsed.parse_errors[:3])
+
         call_edges = build_call_graph(parsed.functions)
         out_degree, _in_degree = compute_degrees(call_edges)
 
@@ -449,6 +470,15 @@ def run_static_analysis(
         workflow_graph, workflow_node_map = _build_workflow_graph_from_ast(run, parsed, call_edges, out_degree)
         lineage_graph, entity_functions = _build_lineage_graph_from_ast(run, parsed)
         risk_summary = _build_risk_summary_from_ast(run, parsed, call_edges)
+        logger.info(
+            "Graph and risk artifacts built run_id=%s workflow_nodes=%s workflow_edges=%s lineage_nodes=%s lineage_edges=%s risk_findings=%s",
+            run.id,
+            len(workflow_graph.nodes),
+            len(workflow_graph.edges),
+            len(lineage_graph.nodes),
+            len(lineage_graph.edges),
+            len(risk_summary.findings),
+        )
 
         if workflow_graph.nodes:
             workflow_graph.nodes.append(Node(id="risk-hub", label="Risk Aggregator", node_type="risk", risk_score=risk_summary.overall_score))
@@ -471,6 +501,7 @@ def run_static_analysis(
             "repo_root": str(repo_root),
         }
     else:
+        logger.warning("No local repository source resolved run_id=%s repo=%s/%s -> fallback mode", run.id, repo.owner, repo.name)
         run.current_step = "fallback-analysis"
         run.progress_pct = 55.0
         update_progress("fallback-analysis", 55.0)
@@ -478,22 +509,22 @@ def run_static_analysis(
         lineage_graph = _build_fallback_lineage(run, repo)
         risk_summary = _build_fallback_risk(run, repo)
 
-        evidences = {
-            "workflow": EvidencePayload(
+        evidences: dict[str, EvidencePayload] = {}
+        for node in [*workflow_graph.nodes, *lineage_graph.nodes]:
+            explanation = (
+                f"Fallback evidence for `{node.label}`. "
+                "Provide local_path on repository registration (or valid git ingestion) for AST-backed evidence."
+            )
+            if node.id == "risk-hub":
+                explanation = "Fallback risk evidence. Real scoring requires scanning a local Python repository clone."
+
+            evidences[node.id] = EvidencePayload(
                 run_id=run.id,
-                node_id="workflow",
+                node_id=node.id,
                 files=["n/a"],
                 symbols=["n/a"],
-                explanation="Fallback evidence. Provide local_path on repository registration for real AST-backed evidence.",
-            ),
-            "risk-hub": EvidencePayload(
-                run_id=run.id,
-                node_id="risk-hub",
-                files=["n/a"],
-                symbols=["n/a"],
-                explanation="Fallback risk evidence. Real scoring requires scanning a local Python repository clone.",
-            ),
-        }
+                explanation=explanation,
+            )
 
         run.summary = {
             "workflow_nodes": len(workflow_graph.nodes),
@@ -506,6 +537,7 @@ def run_static_analysis(
     run.current_step = "persisting-artifacts"
     run.progress_pct = 85.0
     update_progress("persisting-artifacts", 85.0)
+    logger.info("Persisting artifacts run_id=%s", run.id)
 
     store.save_workflow_graph(run.id, workflow_graph)
     store.save_lineage_graph(run.id, lineage_graph)
@@ -520,6 +552,7 @@ def run_static_analysis(
     run.finished_at = run.finished_at or datetime.now(timezone.utc)
     store.save_run(run)
     update_progress("completed", 100.0)
+    logger.info("Static analysis completed run_id=%s mode=%s", run.id, run.summary.get("analysis_mode", "unknown"))
     return run
 
 

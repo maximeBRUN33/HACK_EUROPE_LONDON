@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import ast
+import logging
+import os
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -54,6 +56,8 @@ COMPLEXITY_NODES = (
     ast.ExceptHandler,
     ast.comprehension,
 )
+AST_PROGRESS_EVERY = max(1, int(os.getenv("LEGACY_ATLAS_AST_PROGRESS_EVERY", "100")))
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -210,6 +214,7 @@ def iter_python_files(root: Path, max_files: int = 1000) -> Iterable[Path]:
 
 
 def analyze_python_repository(root: Path) -> ParsedRepository:
+    logger.info("AST analyzer started root=%s", root)
     functions: list[ParsedFunction] = []
     imports: list[tuple[str, str]] = []
     parse_errors: list[str] = []
@@ -217,6 +222,8 @@ def analyze_python_repository(root: Path) -> ParsedRepository:
 
     for file_path in iter_python_files(root):
         files_scanned += 1
+        if files_scanned % AST_PROGRESS_EVERY == 0:
+            logger.info("AST analyzer progress root=%s files_scanned=%s", root, files_scanned)
         rel_file = str(file_path.relative_to(root))
         module_name = _module_name_from_path(root, file_path)
         try:
@@ -228,12 +235,22 @@ def analyze_python_repository(root: Path) -> ParsedRepository:
             tree = ast.parse(source, filename=rel_file)
         except SyntaxError as exc:
             parse_errors.append(f"{rel_file}:{exc.lineno}:{exc.offset} {exc.msg}")
+            logger.debug("AST parse syntax error file=%s line=%s msg=%s", rel_file, exc.lineno, exc.msg)
             continue
 
         visitor = _RepositoryVisitor(module_name=module_name, file_path=rel_file)
         visitor.visit(tree)
         functions.extend(visitor.functions)
         imports.extend(visitor.imports)
+
+    logger.info(
+        "AST analyzer completed root=%s files=%s functions=%s imports=%s parse_errors=%s",
+        root,
+        files_scanned,
+        len(functions),
+        len(imports),
+        len(parse_errors),
+    )
 
     return ParsedRepository(
         root_path=root,

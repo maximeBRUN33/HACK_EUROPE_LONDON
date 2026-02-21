@@ -4,17 +4,17 @@
 
 Legacy Atlas is an AI-powered system that turns large ERP/CRM codebases into:
 
-- Process maps
-- Data lineage graphs
-- Risk dashboards
-- Developer copilots
+- Ontological system understanding
+- Migration intelligence (inbound and outbound)
+- Developer enablement workflows
 
 Success for hackathon MVP:
 
 1. Ingest at least two Python-heavy repos (ERPNext and Odoo module subset).
-2. Generate actionable graph outputs (not only text summaries).
-3. Answer grounded copilot questions with traceability to code locations.
-4. Show one compelling UI walkthrough from workflow to risk to code evidence.
+2. Generate actionable ontology views (entities, workflows, domains, integration directions).
+3. Generate migration-ready outputs (readiness, boundaries, integration routing risks).
+4. Answer grounded copilot questions with traceability to code locations.
+5. Show one compelling UI walkthrough from ontology to migration to implementation evidence.
 
 ## 2) Product Positioning
 
@@ -81,7 +81,80 @@ Why this is the best move:
 - The hackathon winner often has both technical depth and presentation quality.
 - Lovable shortens time to polished interaction design.
 
-## 5) Decision Review (Choice, Alternatives, Tradeoffs)
+## 5) Product Pillars (Locked Scope)
+
+### Pillar 1: Ontological System Understanding (Primary Focus)
+
+Objective:
+
+- Turn legacy codebases into a structured semantic system map developers can reason about.
+
+Required capabilities:
+
+1. Entity extraction:
+   - business entities and data models
+   - ownership and lifecycle mapping
+2. Process mapping:
+   - workflow detection (example: Lead -> Quote -> Order -> Invoice)
+   - entrypoint to execution to persistence chains
+3. Capability clustering:
+   - group modules into business domains and bounded-context candidates
+4. Integration ontology:
+   - inbound systems (APIs, webhooks, queues)
+   - outbound systems (payments, ERP sync, BI)
+   - explicit direction and responsibility
+5. Multi-layer navigation:
+   - business, process, code block, integration, risk overlay
+
+Outcome:
+
+- Developers understand what the system is, not only what code executes.
+
+### Pillar 2: Migration Intelligence (Built on Ontology)
+
+Objective:
+
+- Transform system understanding into actionable migration planning.
+
+Required capabilities:
+
+1. Migration readiness scoring:
+   - coupling, dependency density, integration exposure, risk class
+2. Safe extraction boundary detection:
+   - minimum migration surface, required entities/services, external dependencies
+3. Automated migration blueprint:
+   - exportable spec with data model inventory, API list, impacted modules, phased plan
+4. Integration routing map:
+   - inbound/outbound rerouting and breakpoint flags
+
+Outcome:
+
+- Teams move from analysis to execution with concrete boundary and sequencing guidance.
+
+### Pillar 3: Developer Enablement (Agentic Workflow)
+
+Objective:
+
+- Act as a practical assistant for reasoning, debugging, and decision-making.
+
+Required capabilities:
+
+1. Interactive exploration:
+   - explain workflows and dependencies in natural language
+2. Impact simulation:
+   - "if I change this, what breaks?" path propagation previews
+3. Decision support:
+   - extraction safety, coupling posture, integration risk checkpoints
+4. Guided refactoring:
+   - decoupling suggestions, shared-state risks, anti-pattern highlighting
+5. Onboarding mode:
+   - concise explanation + critical files + recommended reading order
+
+Outcome:
+
+- The product assists thinking and action, not only visualization.
+
+## 6) Decision Review (Choice, Alternatives, Tradeoffs)
 
 ### Decision A: Start with Python repos before PHP/JS
 
@@ -227,7 +300,7 @@ Mitigation:
 
 - Use strict visual language and motion specs from `04-ui-excellence-system.md`.
 
-## 6) Signature Moves (High-Impact Differentiators)
+## 7) Signature Moves (High-Impact Differentiators)
 
 1. Evidence Trace Rail:
    Every node click reveals exact files, symbols, and reasoning steps.
@@ -270,4 +343,3 @@ Planning phase is complete when:
 - CodeWords docs: core concepts, schedules/triggers, workflows API, webhooks, integrations.
 - Dust docs: run_agent, triggers, developer platform, MCP docs integration patterns.
 - Lovable docs: plan mode, integrations, browser testing.
-

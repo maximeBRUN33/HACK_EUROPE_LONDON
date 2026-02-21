@@ -10,10 +10,11 @@ Use documents in this order:
 4. `04-ui-excellence-system.md`
 5. `05-tool-playbooks.md`
 6. `06-testing-and-demo.md`
+7. `07-master-prompts.md`
+8. `08-collaboration-build-guidelines.md`
 
 Expected result of following this package:
 
 - A production-shaped MVP in hackathon time.
 - A visually strong product demo.
 - A credible technical story for judges: deterministic analysis + agentic reasoning + elegant UX.
-

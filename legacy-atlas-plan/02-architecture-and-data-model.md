@@ -60,7 +60,16 @@ Responsibilities:
 - Flag dead code candidates
 - Compute migration readiness score
 
-### D. Dust Semantic Layer
+### D. Ontology Engine
+
+Responsibilities:
+
+- Build semantic model of business entities and lifecycle stages
+- Cluster technical modules into capability domains (CRM, Billing, Inventory, Reporting)
+- Detect integration touchpoints and assign direction (`inbound` vs `outbound`)
+- Serve multi-layer ontology views (business, process, code, integration, risk)
+
+### E. Dust Semantic Layer
 
 Responsibilities:
 
@@ -68,16 +77,18 @@ Responsibilities:
 - Summarize modules and functions
 - Generate risk annotations with evidence links
 - Power copilot question answering on indexed artifacts
+- Generate migration guidance grounded in ontology artifacts
 
-### E. Graph Projection API
+### F. Graph Projection API
 
 Responsibilities:
 
 - Serve process graph and lineage graph queries
 - Return neighborhood expansion quickly
 - Aggregate risk overlays per node and edge
+- Project integration routing and domain capability clusters as graph overlays
 
-### F. Frontend App
+### G. Frontend App
 
 Responsibilities:
 
@@ -86,7 +97,7 @@ Responsibilities:
 - Copilot chat with evidence drill down
 - Compare revisions
 
-### G. CodeWords Orchestration Layer
+### H. CodeWords Orchestration Layer
 
 Responsibilities:
 
@@ -147,6 +158,26 @@ create table entities (
   metadata jsonb not null default '{}'
 );
 
+create table capability_clusters (
+  id uuid primary key,
+  run_id uuid not null references analysis_runs(id),
+  name text not null,                     -- CRM, Billing, Inventory, Reporting
+  node_ids uuid[] not null default '{}',
+  confidence numeric(4,3) not null default 0.5,
+  metadata jsonb not null default '{}'
+);
+
+create table integration_endpoints (
+  id uuid primary key,
+  run_id uuid not null references analysis_runs(id),
+  name text not null,                     -- Stripe API, Webhook X, Queue Y
+  direction text not null,                -- inbound|outbound
+  protocol text,                          -- http|webhook|queue|rpc
+  owner_domain text,                      -- capability cluster name
+  symbol_id uuid references symbols(id),
+  metadata jsonb not null default '{}'
+);
+
 create table lineage_edges (
   id uuid primary key,
   run_id uuid not null references analysis_runs(id),
@@ -186,6 +217,17 @@ create table risk_findings (
   score numeric(5,2) not null,
   rationale text not null,
   evidence jsonb not null default '[]'
+);
+
+create table migration_blueprints (
+  id uuid primary key,
+  run_id uuid not null references analysis_runs(id),
+  migration_readiness numeric(5,2) not null,
+  extraction_boundaries jsonb not null default '[]',
+  integration_routing_risks jsonb not null default '[]',
+  impacted_modules jsonb not null default '[]',
+  phased_plan jsonb not null default '[]',
+  created_at timestamptz not null default now()
 );
 ```
 
@@ -269,6 +311,12 @@ Copilot:
   - input: `question`, `run_id`, optional `focus_node_id`
   - output: `answer`, `citations[]`, `risk_implications[]`, `related_nodes[]`
 
+Contract policy for current sprint:
+
+- Keep existing endpoints stable (no breaking changes).
+- Add ontology and migration intelligence as additive fields in existing responses.
+- Introduce new endpoints only after the collaboration checkpoint and in a dedicated contract PR.
+
 ## 7) End-to-End Interaction Sequences
 
 ### Sequence: Analysis Run
@@ -313,4 +361,3 @@ sequenceDiagram
 2. Add incremental re-analysis by file diff to reduce runtime.
 3. Add graph database cache if traversal latency grows.
 4. Add runtime traces from logs to validate static inference.
-

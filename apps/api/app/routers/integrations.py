@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -7,11 +9,13 @@ from app.services.codewords_client import CodeWordsClient
 from app.services.dust_client import DustClient
 
 router = APIRouter(prefix="/api/integrations", tags=["integrations"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/mcp/status")
 def get_mcp_status() -> dict:
     config = load_mcp_config()
+    logger.info("MCP status requested source=%s exists=%s", config.get("source"), config.get("exists"))
     return safe_mcp_summary(config)
 
 
@@ -24,8 +28,16 @@ def trigger_codewords(payload: CodeWordsTriggerRequest) -> CodeWordsTriggerRespo
     try:
         response = client.trigger(service_id=payload.service_id, inputs=payload.inputs, async_mode=payload.async_mode)
     except RuntimeError as exc:
+        logger.warning("CodeWords trigger failed service_id=%s error=%s", payload.service_id, exc)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
+    logger.info(
+        "CodeWords triggered service_id=%s async=%s status=%s request_id=%s",
+        payload.service_id,
+        payload.async_mode,
+        response.status,
+        response.request_id,
+    )
     return CodeWordsTriggerResponse(
         service_id=payload.service_id,
         status=response.status,
@@ -43,8 +55,10 @@ def poll_codewords_result(request_id: str) -> CodeWordsResultResponse:
     try:
         response = client.poll_result(request_id=request_id)
     except RuntimeError as exc:
+        logger.warning("CodeWords poll failed request_id=%s error=%s", request_id, exc)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
+    logger.info("CodeWords poll request_id=%s status=%s", request_id, response.status)
     return CodeWordsResultResponse(
         request_id=request_id,
         status=response.status,
@@ -61,6 +75,7 @@ class DustStatusResponse(BaseModel):
 @router.get("/dust/status", response_model=DustStatusResponse)
 def get_dust_status() -> DustStatusResponse:
     client = DustClient()
+    logger.info("Dust status requested configured=%s workspace=%s", client.is_configured(), client.workspace_id or "")
     return DustStatusResponse(
         configured=client.is_configured(),
         workspace_id=client.workspace_id or None,

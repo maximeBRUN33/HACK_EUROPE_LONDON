@@ -1,3 +1,4 @@
+import logging
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException
@@ -8,6 +9,7 @@ from app.services.jobs import enqueue_analysis
 from app.store import store
 
 router = APIRouter(prefix="/api/repos", tags=["repos"])
+logger = logging.getLogger(__name__)
 
 
 def _parse_owner_and_name(repo_url: str) -> tuple[str, str]:
@@ -33,6 +35,14 @@ def register_repository(payload: RepositoryRegisterRequest) -> Repository:
         local_path=payload.local_path,
     )
     store.save_repository(repository)
+    logger.info(
+        "Repository registered repo_id=%s repo=%s/%s branch=%s local_path=%s",
+        repository.id,
+        repository.owner,
+        repository.name,
+        repository.default_branch,
+        repository.local_path,
+    )
     return repository
 
 
@@ -48,6 +58,14 @@ def start_scan(repo_id: str, payload: ScanRequest) -> AnalysisRun:
     run.progress_pct = 0.0
     store.save_run(run)
     enqueue_analysis(run_id=str(run.id), repo_id=str(repository.id))
+    logger.info(
+        "Scan queued run_id=%s repo_id=%s repo=%s/%s commit=%s",
+        run.id,
+        repository.id,
+        repository.owner,
+        repository.name,
+        payload.commit_sha,
+    )
     return run
 
 
@@ -56,4 +74,5 @@ def get_run_status(repo_id: str, run_id: str) -> AnalysisRun:
     run = store.get_run_for_repository(repo_id, run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
+    logger.debug("Run status requested run_id=%s repo_id=%s status=%s step=%s progress=%.1f", run_id, repo_id, run.status, run.current_step, run.progress_pct)
     return run

@@ -166,3 +166,7 @@ def test_scan_without_local_path_uses_fallback_mode() -> None:
     ).json()
 
     assert run["summary"]["analysis_mode"] == "fallback"
+    ingest_evidence = client.get(f"/api/runs/{run['id']}/node/ingest/evidence")
+    customer_evidence = client.get(f"/api/runs/{run['id']}/node/entity-customer/evidence")
+    assert ingest_evidence.status_code == 200
+    assert customer_evidence.status_code == 200

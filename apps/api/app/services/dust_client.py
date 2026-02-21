@@ -4,6 +4,7 @@ import json
 import os
 import re
 import time
+import logging
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -24,6 +25,7 @@ class DustClient:
         self.workspace_id = os.getenv("DUST_WORKSPACE_ID", "")
         self.api_key = os.getenv("DUST_API_KEY", "")
         self.configuration_id = os.getenv("DUST_ASSISTANT_CONFIGURATION_ID", "")
+        self.logger = logging.getLogger(__name__)
 
     def is_configured(self) -> bool:
         return bool(self.workspace_id and self.api_key and self.configuration_id)
@@ -31,6 +33,7 @@ class DustClient:
     def semantic_copilot(self, question: str, context: dict) -> DustSemanticResponse:
         if not self.is_configured():
             raise RuntimeError("Dust client not configured")
+        self.logger.info("Dust semantic copilot start workspace=%s", self.workspace_id)
 
         system_request = (
             "You are Legacy Atlas copilot. Use only provided context and do not invent files or symbols. "
@@ -41,7 +44,7 @@ class DustClient:
         )
         user_prompt = (
             f"Question: {question}\n\n"
-            f"Context:\n{json.dumps(context, ensure_ascii=True)}\n\n"
+            f"Context:\n{json.dumps(context, ensure_ascii=True, default=str)}\n\n"
             "JSON format:\n"
             '{"answer":"...","citations":[{"file_path":"...","symbol":"...","reason":"...","line_start":1,"line_end":10}],'
             '"risk_implications":["..."],"related_nodes":["..."]}'
@@ -63,11 +66,13 @@ class DustClient:
 
         if not conversation_id:
             raise RuntimeError("Dust conversation id missing in response")
+        self.logger.info("Dust conversation created id=%s", conversation_id)
 
         raw_text = self._collect_answer_text(conversation_id=conversation_id, message_id=message_id)
         parsed = _extract_json_payload(raw_text)
 
         if not parsed:
+            self.logger.warning("Dust semantic response missing valid JSON conversation_id=%s", conversation_id)
             raise RuntimeError("Dust did not return valid JSON response")
 
         answer = str(parsed.get("answer", "")).strip()
@@ -75,13 +80,21 @@ class DustClient:
         risk_implications = parsed.get("risk_implications", [])
         related_nodes = parsed.get("related_nodes", [])
 
-        return DustSemanticResponse(
+        response = DustSemanticResponse(
             answer=answer or "No answer generated",
             citations=_normalize_citations(citations),
             risk_implications=[str(item) for item in risk_implications if str(item).strip()],
             related_nodes=[str(item) for item in related_nodes if str(item).strip()],
             raw_text=raw_text,
         )
+        self.logger.info(
+            "Dust semantic copilot completed conversation_id=%s citations=%s implications=%s related_nodes=%s",
+            conversation_id,
+            len(response.citations),
+            len(response.risk_implications),
+            len(response.related_nodes),
+        )
+        return response
 
     def _create_conversation(self, system_request: str, user_prompt: str) -> dict:
         url = f"{self.base_url}/w/{self.workspace_id}/assistant/conversations"
@@ -104,21 +117,26 @@ class DustClient:
     def _collect_answer_text(self, conversation_id: str, message_id: str | None) -> str:
         deadline = time.time() + 25
         last_payload: dict = {}
+        attempts = 0
 
         while time.time() < deadline:
+            attempts += 1
             payload = self._get_conversation(conversation_id=conversation_id)
             last_payload = payload
 
             text = _extract_text_from_conversation(payload)
             if text:
+                self.logger.info("Dust response received conversation_id=%s attempts=%s", conversation_id, attempts)
                 return text
 
             time.sleep(1.0)
 
         fallback_text = _extract_text_from_conversation(last_payload)
         if fallback_text:
+            self.logger.info("Dust response received at timeout boundary conversation_id=%s attempts=%s", conversation_id, attempts)
             return fallback_text
 
+        self.logger.warning("Dust response timeout conversation_id=%s attempts=%s", conversation_id, attempts)
         raise RuntimeError("Dust response timeout")
 
     def _get_conversation(self, conversation_id: str) -> dict:

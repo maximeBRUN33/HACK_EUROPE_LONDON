@@ -25,6 +25,8 @@ pip install -e .
 uvicorn app.main:app --reload --port 8000
 ```
 
+The API auto-loads `apps/api/.env` at startup (without overwriting env vars already exported in your shell).
+
 ### 2) Run web app
 
 ```bash
@@ -76,12 +78,21 @@ make web-run
 - `LEGACY_ATLAS_REPO_CACHE`: local clone cache directory for Git-based ingestion.
 - `LEGACY_ATLAS_ENABLE_GIT_INGESTION`: set to `0` to disable remote clone/fetch ingestion.
 - `LEGACY_ATLAS_SYNC_JOBS`: set to `1` to run analysis inline (useful for tests).
+- `LEGACY_ATLAS_LOG_LEVEL`: runtime logging level (`DEBUG`, `INFO`, `WARNING`, ...).
+- `LEGACY_ATLAS_AST_PROGRESS_EVERY`: log AST scan progress every N Python files.
 - `CODEWORDS_RUNTIME_BASE_URL`: CodeWords runtime base URL.
 - `CODEWORDS_API_KEY`: API key for CodeWords runtime.
 - `DUST_API_BASE_URL`: Dust API base URL (default `https://dust.tt/api/v1`).
 - `DUST_WORKSPACE_ID`: Dust workspace id.
 - `DUST_API_KEY`: Dust API key.
 - `DUST_ASSISTANT_CONFIGURATION_ID`: Dust assistant configuration id used for semantic copilot responses.
+
+To watch analysis internals live in terminal, start API with:
+
+```bash
+cd apps/api
+LEGACY_ATLAS_LOG_LEVEL=DEBUG uvicorn app.main:app --reload --port 8000
+```
 
 ## Tests
 

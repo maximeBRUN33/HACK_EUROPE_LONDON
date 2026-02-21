@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, HTTPException
 
 from app.models import CopilotCitation, CopilotRequest, CopilotResponse
@@ -5,10 +7,12 @@ from app.services.dust_client import DustClient
 from app.store import store
 
 router = APIRouter(prefix="/api/copilot", tags=["copilot"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/query", response_model=CopilotResponse)
 def query_copilot(payload: CopilotRequest) -> CopilotResponse:
+    logger.info("Copilot query received run_id=%s focus_node=%s", payload.run_id, payload.focus_node_id or "auto")
     run = store.get_run(str(payload.run_id))
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -54,6 +58,7 @@ def query_copilot(payload: CopilotRequest) -> CopilotResponse:
     dust = DustClient()
     if dust.is_configured():
         try:
+            logger.info("Routing copilot query to Dust run_id=%s", payload.run_id)
             semantic = dust.semantic_copilot(question=payload.question, context=context)
             citations = [
                 CopilotCitation(
@@ -80,6 +85,7 @@ def query_copilot(payload: CopilotRequest) -> CopilotResponse:
             )
         except RuntimeError:
             # Fall through to local fallback when Dust is temporarily unavailable.
+            logger.warning("Dust semantic copilot unavailable; using local fallback run_id=%s", payload.run_id)
             pass
 
     top_risk = max(risk.findings, key=lambda finding: finding.score)
@@ -111,6 +117,7 @@ def query_copilot(payload: CopilotRequest) -> CopilotResponse:
 
     related = [node.id for node in graph.nodes[:5]]
 
+    logger.info("Returning local copilot fallback run_id=%s citations=%s", payload.run_id, len(citations))
     return CopilotResponse(
         answer=answer,
         citations=citations,

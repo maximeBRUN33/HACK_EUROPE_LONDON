@@ -1,5 +1,14 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from app.env_loader import load_env_file
+from app.logging_config import setup_logging
+
+ENV_FILE_LOADED = load_env_file()
+setup_logging()
+logger = logging.getLogger(__name__)
 
 from app.routers.copilot import router as copilot_router
 from app.routers.graphs import router as graphs_router
@@ -22,3 +31,5 @@ app.include_router(repos_router)
 app.include_router(graphs_router)
 app.include_router(copilot_router)
 app.include_router(integrations_router)
+
+logger.info("Legacy Atlas API initialized env_file_loaded=%s", ENV_FILE_LOADED)
