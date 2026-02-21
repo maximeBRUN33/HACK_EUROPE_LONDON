@@ -224,7 +224,7 @@ export function App(): JSX.Element {
   }
 
   return (
-    <div className="app-shell app-shell-dark app-shell-enter">
+    <div className="app-shell app-shell-enter">
       <header className="header-compact">
         <h1>Legacy Atlas</h1>
         <div className={`run-pill run-pill-${state.run!.status}`}>{runSummary}</div>
@@ -266,6 +266,12 @@ export function App(): JSX.Element {
         <button className={`tab-btn ${activeTab === "risk" ? "active" : ""}`} onClick={() => setActiveTab("risk")}>Risk Analysis</button>
         <button className={`tab-btn ${activeTab === "copilot" ? "active" : ""}`} onClick={() => setActiveTab("copilot")}>Copilot</button>
       </nav>
+      <p className="tab-description">
+        {activeTab === "process" && "How your codebase\u2019s business workflows connect and flow"}
+        {activeTab === "data" && "How data entities move across modules in your system"}
+        {activeTab === "risk" && "Where complexity and technical debt create migration risk"}
+        {activeTab === "copilot" && "Ask questions about the codebase and get cited answers"}
+      </p>
 
       <main>
         {activeTab === "process" && (

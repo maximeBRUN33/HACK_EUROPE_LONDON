@@ -16,6 +16,19 @@ type GraphPanelProps = {
   enrichment?: EnrichmentPayload | null;
 };
 
+function humanizeLabel(label: string): string {
+  const words = label
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .split(/\s+/);
+  const strip = ["View", "Model", "Serializer", "Controller", "Handler", "Manager", "Mixin"];
+  if (words.length > 1 && strip.includes(words[words.length - 1])) {
+    words.pop();
+  }
+  return words.join(" ");
+}
+
 export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNode, focusedNodeId, riskOverlay, showEdgeLabels, riskSummary, enrichment }: GraphPanelProps): JSX.Element {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [nodeSubtitles, setNodeSubtitles] = useState<Map<string, string>>(new Map());
@@ -95,6 +108,13 @@ export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNo
 
   const riskPct = selectedNode ? Math.min(100, Math.round(selectedNode.risk_score)) : 0;
   const riskBarColor = riskPct > 70 ? "var(--risk-high)" : riskPct >= 50 ? "var(--risk-mid)" : "var(--risk-low)";
+  const riskExplanation = riskPct > 70
+    ? "High risk \u2014 changes here could break other parts"
+    : riskPct > 50
+      ? "Elevated risk \u2014 consider refactoring before changes"
+      : riskPct >= 30
+        ? "Moderate risk \u2014 some complexity to manage"
+        : "Low risk \u2014 simple, well-structured code";
 
   return (
     <section className="card graph-card">
@@ -128,7 +148,7 @@ export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNo
 
           {selectedNode && (
             <div className="detail-panel">
-              <h3 className="detail-node-name">{selectedNode.label}</h3>
+              <h3 className="detail-node-name">{humanizeLabel(selectedNode.label)}</h3>
               <div className="detail-badges">
                 <span className={`node-pill ${selectedNode.node_type}`}>{selectedNode.node_type}</span>
               </div>
@@ -141,10 +161,11 @@ export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNo
                   </div>
                   <span className="detail-risk-value" style={{ color: riskBarColor }}>{riskPct}</span>
                 </div>
+                <p className="risk-explanation">{riskExplanation}</p>
               </div>
 
               <div className="detail-section">
-                <span className="detail-section-label">Evidence</span>
+                <span className="detail-section-label">What This Does</span>
                 {evidenceLoading && <p className="muted">Loading...</p>}
                 {!evidenceLoading && !evidence && <p className="muted">No evidence available.</p>}
                 {!evidenceLoading && evidence && (
@@ -152,7 +173,7 @@ export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNo
                     <p className="detail-explanation">{evidence.explanation}</p>
                     {evidence.files.length > 0 && (
                       <>
-                        <span className="detail-sub-label">Files</span>
+                        <span className="detail-sub-label">Source Files</span>
                         <ul className="detail-list">
                           {evidence.files.map((file) => (
                             <li key={file}><code>{file}</code></li>
@@ -162,7 +183,7 @@ export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNo
                     )}
                     {evidence.symbols.length > 0 && (
                       <>
-                        <span className="detail-sub-label">Symbols</span>
+                        <span className="detail-sub-label">Code References</span>
                         <ul className="detail-list">
                           {evidence.symbols.map((symbol) => (
                             <li key={symbol}><code>{symbol}</code></li>
@@ -176,7 +197,7 @@ export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNo
 
               {connectedNodeIds.length > 0 && (
                 <div className="detail-section">
-                  <span className="detail-section-label">Connected Nodes</span>
+                  <span className="detail-section-label">Connects To</span>
                   <div className="detail-connected">
                     {connectedNodeIds.map((id) => (
                       <span
@@ -187,7 +208,7 @@ export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNo
                         onClick={() => setSelectedNodeId(id)}
                         onKeyDown={(e) => { if (e.key === "Enter") setSelectedNodeId(id); }}
                       >
-                        {id}
+                        {humanizeLabel(id)}
                       </span>
                     ))}
                   </div>
@@ -219,7 +240,7 @@ export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNo
 
               {relevantFindings.length > 0 && (
                 <div className="detail-section">
-                  <span className="detail-section-label">Migration Suggestions</span>
+                  <span className="detail-section-label">Recommended Actions</span>
                   {relevantFindings.map((finding) =>
                     finding.migration_suggestions?.map((sug, idx) => (
                       <div key={`${finding.id}-${idx}`} className="migration-suggestion-item">

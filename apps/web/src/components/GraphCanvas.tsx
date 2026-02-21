@@ -141,16 +141,16 @@ export function GraphCanvas({ graph, selectedNodeId, onSelectNode, nodeSubtitles
       >
         <defs>
           <marker id="arrow-control" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#5ec9f3" />
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#D1D5DB" />
           </marker>
           <marker id="arrow-data" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#7ce3b6" />
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#D1D5DB" />
           </marker>
           <marker id="arrow-data-lg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#7ce3b6" />
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#D1D5DB" />
           </marker>
           <marker id="arrow-risk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#ff8a6f" />
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#D1D5DB" />
           </marker>
         </defs>
 
@@ -215,13 +215,11 @@ export function GraphCanvas({ graph, selectedNodeId, onSelectNode, nodeSubtitles
               <rect x={-halfW} y={-halfH} rx={12} ry={12} width={NODE_WIDTH} height={NODE_HEIGHT} />
               <circle cx={halfW - 18} cy={0} r={7} fill={riskColor} opacity={0.85} />
               <text className="node-label" x={-halfW + 16} y={-6} textAnchor="start">
-                {truncate(node.label, 30)}
+                {truncate(humanizeLabel(node.label), 30)}
               </text>
-              {nodeSubtitles?.get(node.id) && (
-                <text className="node-subtitle" x={-halfW + 16} y={10} textAnchor="start">
-                  {truncate(nodeSubtitles.get(node.id)!, 32)}
-                </text>
-              )}
+              <text className="node-subtitle" x={-halfW + 16} y={10} textAnchor="start">
+                {truncate(nodeSubtitles?.get(node.id) ?? inferOperation(node.label) ?? "", 32)}
+              </text>
               <text className="node-meta" x={halfW - 32} y={-6} textAnchor="end">
                 {Math.round(node.risk_score)}
               </text>
@@ -231,6 +229,29 @@ export function GraphCanvas({ graph, selectedNodeId, onSelectNode, nodeSubtitles
       </svg>
     </div>
   );
+}
+
+function humanizeLabel(label: string): string {
+  const words = label
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .split(/\s+/);
+  const strip = ["View", "Model", "Serializer", "Controller", "Handler", "Manager", "Mixin"];
+  if (words.length > 1 && strip.includes(words[words.length - 1])) {
+    words.pop();
+  }
+  return words.join(" ");
+}
+
+function inferOperation(label: string): string | null {
+  const l = label.toLowerCase();
+  if (l.includes("create")) return "POST";
+  if (l.includes("delete") || l.includes("destroy")) return "DELETE";
+  if (l.includes("update") || l.includes("edit")) return "PUT";
+  if (l.includes("list") || l.includes("index")) return "GET";
+  if (l.includes("detail") || l.includes("retrieve")) return "GET";
+  return null;
 }
 
 function truncate(value: string, max: number): string {
@@ -247,9 +268,9 @@ function riskLevelClass(score: number): string {
 }
 
 function riskScoreColor(score: number): string {
-  if (score > 70) return "#ff5c5c";
-  if (score >= 50) return "#ffb020";
-  return "#2fbf71";
+  if (score > 70) return "#EF4444";
+  if (score >= 50) return "#F59E0B";
+  return "#22C55E";
 }
 
 function verticalCurvedPath(source: Point, target: Point): string {

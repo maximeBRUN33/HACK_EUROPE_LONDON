@@ -39,13 +39,6 @@ function stepStatus(stepKey: string, currentStep: string, runStatus: string): "p
   return "pending";
 }
 
-const FEATURES = [
-  { icon: "\uD83D\uDD0D", label: "Process Maps" },
-  { icon: "\uD83D\uDCCA", label: "Risk Analysis" },
-  { icon: "\uD83D\uDD17", label: "Data Lineage" },
-  { icon: "\uD83E\uDD16", label: "AI Copilot" },
-] as const;
-
 export function RepoIntakePanel({ isBusy, run, dustConfigured, codewordsConfigured, onStart }: RepoIntakePanelProps): JSX.Element {
   const [repoUrl, setRepoUrl] = useState("https://github.com/akashroshan135/inventory-management.git");
   const [commitSha, setCommitSha] = useState("main");
