@@ -1,0 +1,107 @@
+from fastapi import APIRouter, HTTPException
+
+from app.models import CopilotCitation, CopilotRequest, CopilotResponse
+from app.services.dust_client import DustClient
+from app.store import store
+
+router = APIRouter(prefix="/api/copilot", tags=["copilot"])
+
+
+@router.post("/query", response_model=CopilotResponse)
+def query_copilot(payload: CopilotRequest) -> CopilotResponse:
+    run = store.get_run(str(payload.run_id))
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    risk = store.get_risk_summary(str(payload.run_id))
+    graph = store.get_workflow_graph(str(payload.run_id))
+
+    if risk is None or graph is None:
+        raise HTTPException(status_code=400, detail="Run exists but semantic artifacts are not ready")
+    if not graph.nodes:
+        raise HTTPException(status_code=400, detail="Graph is empty for this run")
+
+    focus = payload.focus_node_id or graph.nodes[0].id
+    focus_evidence = store.get_evidence(str(payload.run_id), focus)
+
+    context = {
+        "run": {
+            "id": str(run.id),
+            "status": run.status.value,
+            "summary": run.summary,
+        },
+        "question": payload.question,
+        "focus_node_id": focus,
+        "workflow_nodes": [node.model_dump() for node in graph.nodes[:12]],
+        "workflow_edges": [edge.model_dump() for edge in graph.edges[:20]],
+        "risk_findings": [finding.model_dump() for finding in risk.findings[:8]],
+        "focus_evidence": focus_evidence.model_dump() if focus_evidence else None,
+    }
+
+    dust = DustClient()
+    if dust.is_configured():
+        try:
+            semantic = dust.semantic_copilot(question=payload.question, context=context)
+            citations = [
+                CopilotCitation(
+                    file_path=item["file_path"],
+                    symbol=item["symbol"],
+                    reason=item["reason"],
+                )
+                for item in semantic.citations
+            ]
+
+            if not citations and focus_evidence:
+                citations = [
+                    CopilotCitation(file_path=file_path, symbol=symbol, reason="Focused evidence from analysis artifact")
+                    for file_path, symbol in zip(focus_evidence.files[:3], focus_evidence.symbols[:3], strict=False)
+                ]
+
+            return CopilotResponse(
+                answer=semantic.answer,
+                citations=citations,
+                risk_implications=semantic.risk_implications or ["Dust returned no explicit implications"],
+                related_nodes=semantic.related_nodes or [node.id for node in graph.nodes[:5]],
+            )
+        except RuntimeError:
+            # Fall through to local fallback when Dust is temporarily unavailable.
+            pass
+
+    top_risk = max(risk.findings, key=lambda finding: finding.score)
+    citations: list[CopilotCitation] = []
+
+    if focus_evidence:
+        for file_path, symbol in zip(focus_evidence.files[:3], focus_evidence.symbols[:3], strict=False):
+            citations.append(
+                CopilotCitation(
+                    file_path=file_path,
+                    symbol=symbol,
+                    reason=f"Evidence linked to focused node `{focus}`.",
+                )
+            )
+
+    if not citations:
+        citations.append(
+            CopilotCitation(
+                file_path=top_risk.symbol.split(".")[0] + ".py" if "." in top_risk.symbol else "unknown.py",
+                symbol=top_risk.symbol,
+                reason="Highest risk symbol in this run.",
+            )
+        )
+
+    answer = (
+        f"Primary impact area is `{top_risk.symbol}` ({top_risk.severity}, score {top_risk.score}). "
+        f"For change around `{focus}`, prioritize tests on dependent calls and data-flow handoffs shown in workflow/lineage graphs."
+    )
+
+    related = [node.id for node in graph.nodes[:5]]
+
+    return CopilotResponse(
+        answer=answer,
+        citations=citations,
+        risk_implications=[
+            f"Top risk category: {top_risk.category}",
+            "Potential regressions where control-flow and data-flow intersect",
+        ],
+        related_nodes=related,
+    )

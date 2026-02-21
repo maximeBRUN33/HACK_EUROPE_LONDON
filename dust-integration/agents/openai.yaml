@@ -1,0 +1,4 @@
+version: 1
+display_name: Dust Integration
+short_description: Integrate Dust via API, SDK, and MCP workflows
+default_prompt: Implement and troubleshoot Dust API, SDK, and MCP integrations with production-ready code and verification steps.

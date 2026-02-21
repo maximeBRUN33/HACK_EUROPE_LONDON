@@ -1,0 +1,78 @@
+Build a premium, graph-first web application called "Legacy Atlas".
+
+Goal:
+Create a production-quality frontend for understanding legacy ERP/CRM codebases using process maps, data lineage, risk insights, and an evidence-grounded copilot.
+
+Tech constraints:
+- React + TypeScript + Vite
+- Do not use Next.js
+- Keep code modular and cleanly typed
+- No mock backend in final wired flow
+
+Backend API base:
+- Use environment variable `VITE_API_BASE_URL` with fallback `http://localhost:8000`
+
+Required backend endpoints:
+- POST /api/repos/register
+- POST /api/repos/{repo_id}/scan
+- GET /api/repos/{repo_id}/runs/{run_id}
+- GET /api/runs/{run_id}/workflow-graph
+- GET /api/runs/{run_id}/lineage-graph
+- GET /api/runs/{run_id}/risk-summary
+- GET /api/runs/{run_id}/node/{node_id}/evidence
+- POST /api/copilot/query
+
+Main product areas:
+1) Repository Mission Control
+- Inputs: repository URL, commit SHA, local repo path (optional but recommended)
+- Trigger register + scan flow
+- Show run status and analysis mode (`ast-local` or fallback)
+
+2) Process Atlas
+- Interactive graph canvas using SVG
+- Nodes and directed edges
+- Node click opens inspector panel
+- Show risk score and adjacent edges
+
+3) Data Lineage Navigator
+- Separate graph panel focused on data/entity transitions
+- Clear directionality and confidence indication
+
+4) Risk Observatory
+- Overall score and ranked findings list
+- Severity visual language (low, medium, high, critical)
+- Compact yet high-signal cards
+
+5) Developer Copilot
+- Question box and response panel
+- Always show citations
+- Show related nodes and risk implications
+
+Design direction:
+- Not generic dashboard; should look intentional and premium
+- Typography: Space Grotesk for display, IBM Plex Sans for body, JetBrains Mono for code/metrics
+- Color palette: deep navy + cyan/amber/coral accents (no purple)
+- Rich but restrained gradients
+- Crisp spacing and strong hierarchy
+
+Interaction quality:
+- Meaningful transitions for graph selection and panel updates
+- Keyboard-accessible node selection
+- Responsive layout for desktop and mobile
+- Clear loading, empty, and error states
+
+Performance expectations:
+- Keep graph rendering light and fast
+- Avoid heavy visualization libraries unless absolutely needed
+- Minimize unnecessary re-renders
+
+Code quality requirements:
+- Components split by responsibility
+- Shared typed API client layer
+- Avoid duplication
+- Include concise comments only where logic is non-obvious
+
+Deliverables:
+- Fully working frontend with all routes and components
+- Clean build passing TypeScript checks
+- Ready to run locally with `npm install` and `npm run dev`

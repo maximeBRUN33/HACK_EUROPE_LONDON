@@ -1,0 +1,474 @@
+:root {
+  --bg-deep: #07111a;
+  --bg-surface: #0f1e2b;
+  --bg-elevated: #162a3b;
+  --ink-high: #eaf2f8;
+  --ink-mid: #9fb5c8;
+  --ink-low: #7f9ab0;
+  --accent-cyan: #37d5d6;
+  --accent-amber: #ffc247;
+  --accent-coral: #ff6f61;
+  --accent-mint: #74e2b1;
+  --risk-low: #2fbf71;
+  --risk-mid: #ffb020;
+  --risk-high: #ff5c5c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: "IBM Plex Sans", sans-serif;
+  background:
+    radial-gradient(circle at 10% 12%, rgba(70, 145, 197, 0.18), transparent 35%),
+    radial-gradient(circle at 84% 0%, rgba(53, 118, 163, 0.26), transparent 28%),
+    linear-gradient(165deg, #08121c 0%, #091623 35%, #07111a 100%);
+  color: var(--ink-high);
+}
+
+.app-shell {
+  width: min(1280px, 94vw);
+  margin: 24px auto 40px;
+}
+
+header {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid rgba(61, 108, 146, 0.36);
+  background: linear-gradient(135deg, rgba(16, 36, 54, 0.9), rgba(12, 27, 40, 0.75));
+  padding: 20px 20px 16px;
+}
+
+header::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent, rgba(100, 198, 233, 0.06), transparent 72%);
+  pointer-events: none;
+}
+
+header h1 {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(2rem, 4vw, 3rem);
+  letter-spacing: 0.02em;
+}
+
+header p {
+  color: var(--ink-mid);
+  margin: 10px 0 14px;
+  max-width: 760px;
+}
+
+.run-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 8px 14px;
+  border: 1px solid rgba(70, 131, 171, 0.52);
+  background: rgba(5, 23, 37, 0.66);
+  font-size: 0.86rem;
+  color: var(--accent-cyan);
+  font-family: "JetBrains Mono", monospace;
+}
+
+main {
+  margin-top: 16px;
+  display: grid;
+  gap: 16px;
+}
+
+.card {
+  background: linear-gradient(168deg, rgba(21, 44, 66, 0.96), rgba(10, 22, 35, 0.94));
+  border: 1px solid rgba(61, 111, 142, 0.42);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.28);
+}
+
+.card-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.card h2 {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.18rem;
+}
+
+.badge {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+  color: #02121f;
+  background: var(--accent-cyan);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.badge.subtle {
+  background: rgba(44, 89, 117, 0.7);
+  color: var(--ink-mid);
+}
+
+.badge.high {
+  background: var(--accent-coral);
+  color: #fff;
+}
+
+.grid.two-col {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stack {
+  display: grid;
+  gap: 10px;
+}
+
+label {
+  font-size: 0.87rem;
+  color: var(--ink-mid);
+  display: grid;
+  gap: 6px;
+}
+
+input,
+textarea,
+button {
+  font: inherit;
+}
+
+input,
+textarea {
+  background: rgba(5, 15, 24, 0.88);
+  border: 1px solid rgba(66, 110, 138, 0.58);
+  color: var(--ink-high);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+input:focus,
+textarea:focus {
+  outline: 2px solid rgba(55, 213, 214, 0.2);
+  border-color: var(--accent-cyan);
+}
+
+button {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #4de1dc, #2da7c3);
+  color: #041219;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 120ms ease, filter 140ms ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: saturate(1.08);
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.graph-card {
+  display: grid;
+  gap: 12px;
+}
+
+.graph-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.graph-stats > div {
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(58, 105, 136, 0.43);
+  background: rgba(9, 22, 33, 0.62);
+  display: grid;
+  gap: 4px;
+}
+
+.graph-stats span {
+  color: var(--ink-low);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.graph-stats strong {
+  color: var(--ink-high);
+  font-size: 0.95rem;
+}
+
+.graph-canvas-wrap {
+  border-radius: 14px;
+  border: 1px solid rgba(58, 101, 130, 0.48);
+  background:
+    radial-gradient(circle at 14% 18%, rgba(31, 78, 112, 0.28), transparent 42%),
+    linear-gradient(180deg, rgba(7, 20, 32, 0.92), rgba(6, 16, 26, 0.9));
+  min-height: 320px;
+  overflow: hidden;
+}
+
+.graph-canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.edge {
+  fill: none;
+  stroke-width: 2.2;
+}
+
+.edge-control {
+  stroke: #5ec9f3;
+}
+
+.edge-data {
+  stroke: #7ce3b6;
+}
+
+.edge-risk {
+  stroke: #ff8a6f;
+}
+
+.graph-node {
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+
+.graph-node:hover {
+  transform: scale(1.01);
+}
+
+.graph-node:focus-visible rect {
+  stroke: #d6f4ff;
+  stroke-width: 2.6;
+}
+
+.graph-node rect {
+  fill: rgba(12, 29, 44, 0.9);
+  stroke: rgba(72, 123, 156, 0.6);
+  stroke-width: 1.5;
+}
+
+.graph-node.node-data rect {
+  fill: rgba(10, 39, 45, 0.88);
+  stroke: rgba(95, 181, 149, 0.74);
+}
+
+.graph-node.node-risk rect {
+  fill: rgba(42, 18, 17, 0.82);
+  stroke: rgba(255, 123, 95, 0.76);
+}
+
+.graph-node.selected rect {
+  stroke-width: 2.4;
+  stroke: #d6f4ff;
+}
+
+.node-label {
+  font-size: 12px;
+  fill: var(--ink-high);
+  font-family: "IBM Plex Sans", sans-serif;
+}
+
+.node-meta {
+  font-size: 10px;
+  fill: var(--ink-mid);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.graph-inspector {
+  border-radius: 12px;
+  border: 1px solid rgba(61, 104, 137, 0.4);
+  background: rgba(8, 18, 28, 0.66);
+  padding: 12px;
+}
+
+.graph-inspector h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.evidence-panel {
+  margin-top: 12px;
+  border-top: 1px solid rgba(63, 105, 134, 0.38);
+  padding-top: 10px;
+}
+
+.evidence-panel h4 {
+  margin: 0 0 8px;
+  font-size: 0.88rem;
+  color: var(--accent-amber);
+}
+
+.graph-inspector p {
+  margin: 0 0 10px;
+}
+
+.node-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  margin-right: 6px;
+  text-transform: uppercase;
+}
+
+.node-pill.process {
+  background: rgba(65, 127, 170, 0.35);
+  color: #a8e5ff;
+}
+
+.node-pill.data {
+  background: rgba(61, 152, 117, 0.32);
+  color: #a9f4d4;
+}
+
+.node-pill.risk {
+  background: rgba(174, 75, 69, 0.35);
+  color: #ffd2c6;
+}
+
+.node-risk {
+  color: var(--accent-amber);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.82rem;
+}
+
+.edge-list,
+.finding-list,
+.citation-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.edge-list li,
+.finding-list li,
+.citation-list li {
+  padding: 9px;
+  border-radius: 10px;
+  border: 1px solid rgba(68, 104, 128, 0.45);
+  background: rgba(8, 16, 23, 0.58);
+  display: grid;
+  gap: 4px;
+  color: var(--ink-mid);
+}
+
+.edge-list.compact li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.edge-list code,
+.citation-list code {
+  color: #c6e9ff;
+  background: rgba(9, 30, 43, 0.8);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+
+.finding-list strong,
+.citation-list strong {
+  color: var(--ink-high);
+}
+
+.finding-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.finding-meta span {
+  font-size: 0.76rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(72, 107, 126, 0.46);
+  background: rgba(7, 24, 34, 0.6);
+}
+
+.score {
+  font-size: 1.03rem;
+  font-family: "JetBrains Mono", monospace;
+  color: var(--accent-amber);
+  margin-bottom: 10px;
+}
+
+.severity-high {
+  border-color: rgba(255, 108, 92, 0.45) !important;
+}
+
+.severity-critical {
+  border-color: rgba(255, 65, 65, 0.78) !important;
+}
+
+.response {
+  margin-top: 12px;
+}
+
+.response h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  color: var(--accent-amber);
+}
+
+.error {
+  margin-top: 8px;
+  color: var(--accent-coral);
+}
+
+.muted {
+  color: var(--ink-mid);
+}
+
+@media (max-width: 1080px) {
+  .grid.two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .graph-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    width: 95vw;
+    margin-top: 14px;
+  }
+
+  header {
+    padding: 14px;
+  }
+
+  .card {
+    padding: 12px;
+  }
+}
