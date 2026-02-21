@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { EnrichmentPayload, EvidencePayload, GraphPayload, RiskSummary } from "../lib/api";
 import { fetchNodeEvidence } from "../lib/api";
-import { GraphCanvas } from "./GraphCanvas";
+import { GraphCanvas, humanizeLabel, nodeDescription } from "./GraphCanvas";
 
 type GraphPanelProps = {
   title: string;
@@ -17,22 +17,36 @@ type GraphPanelProps = {
   graphMode?: "process" | "lineage";
 };
 
-function humanizeLabel(label: string): string {
-  const words = label
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
-    .replace(/_/g, " ")
-    .split(/\s+/);
-  const strip = ["View", "Model", "Serializer", "Controller", "Handler", "Manager", "Mixin"];
-  if (words.length > 1 && strip.includes(words[words.length - 1])) {
-    words.pop();
-  }
-  return words.join(" ");
+type NodeMeta = { crudOps: string[]; modules: string[] };
+
+/** Extract entity name from evidence explanation text.
+ *  Looks for patterns like: Entity `Stock`, entity "Order", data entity Stock */
+function extractEntityName(explanation: string): string | null {
+  const backtickMatch = explanation.match(/[Ee]ntity\s+`([^`]+)`/);
+  if (backtickMatch) return backtickMatch[1];
+  const quoteMatch = explanation.match(/[Ee]ntity\s+"([^"]+)"/);
+  if (quoteMatch) return quoteMatch[1];
+  const plainMatch = explanation.match(/[Ee]ntity\s+([A-Z][a-zA-Z]*)/);
+  if (plainMatch) return plainMatch[1];
+  return null;
+}
+
+/** Extract CRUD operations mentioned in evidence explanation. */
+function extractCrudOps(explanation: string): string[] {
+  const ops: string[] = [];
+  const lower = explanation.toLowerCase();
+  if (lower.includes("create") || lower.includes("insert") || lower.includes("add")) ops.push("Create");
+  if (lower.includes("read") || lower.includes("fetch") || lower.includes("get") || lower.includes("list") || lower.includes("retrieve") || lower.includes("query")) ops.push("Read");
+  if (lower.includes("update") || lower.includes("edit") || lower.includes("modify") || lower.includes("change")) ops.push("Update");
+  if (lower.includes("delete") || lower.includes("remove") || lower.includes("destroy")) ops.push("Delete");
+  return ops;
 }
 
 export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNode, focusedNodeId, riskOverlay, showEdgeLabels, riskSummary, enrichment, graphMode }: GraphPanelProps): JSX.Element {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [nodeDisplayNames, setNodeDisplayNames] = useState<Map<string, string>>(new Map());
   const [nodeSubtitles, setNodeSubtitles] = useState<Map<string, string>>(new Map());
+  const [nodeMeta, setNodeMeta] = useState<Map<string, NodeMeta>>(new Map());
   const [showLegend, setShowLegend] = useState(false);
   const [showNodeInfo, setShowNodeInfo] = useState(false);
 
@@ -44,32 +58,54 @@ export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNo
 
   useEffect(() => {
     if (!graph || graph.nodes.length === 0) {
+      setNodeDisplayNames(new Map());
       setNodeSubtitles(new Map());
+      setNodeMeta(new Map());
       return;
     }
     const runId = graph.run_id;
+    const names = new Map<string, string>();
     const subtitles = new Map<string, string>();
+    const meta = new Map<string, NodeMeta>();
+    const isLineage = graphMode === "lineage";
     Promise.all(
       graph.nodes.map(async (node) => {
         try {
           const ev = await fetchNodeEvidence(runId, node.id);
-          const firstSymbol = ev.symbols[0];
-          let subtitle = ev.files[0] ?? "";
-          if (firstSymbol) {
-            const parts = firstSymbol.split(".");
-            subtitle = parts.length >= 2 ? parts[parts.length - 2] : firstSymbol;
+
+          if (isLineage) {
+            // For lineage: extract entity name from explanation
+            const entityName = extractEntityName(ev.explanation) ?? humanizeLabel(node.label);
+            names.set(node.id, entityName);
+            // Extract CRUD ops and modules
+            const crudOps = extractCrudOps(ev.explanation);
+            const modules = ev.files.map((f) => f.split("/")[0] || f);
+            meta.set(node.id, { crudOps, modules: [...new Set(modules)] });
+          } else {
+            // For process: extract class name from first symbol
+            const firstSymbol = ev.symbols[0];
+            if (firstSymbol) {
+              const parts = firstSymbol.split(".");
+              const className = parts.length >= 2 ? parts[parts.length - 2] : firstSymbol;
+              names.set(node.id, humanizeLabel(className));
+            }
           }
-          if (subtitle) {
-            subtitles.set(node.id, subtitle);
+
+          // File path as subtitle
+          const filePath = ev.files[0] ?? "";
+          if (filePath) {
+            subtitles.set(node.id, filePath);
           }
         } catch {
           // skip nodes without evidence
         }
       })
     ).then(() => {
+      setNodeDisplayNames(new Map(names));
       setNodeSubtitles(new Map(subtitles));
+      setNodeMeta(new Map(meta));
     });
-  }, [graph]);
+  }, [graph, graphMode]);
 
   const selectedNode = useMemo(() => {
     if (!graph) {
@@ -109,6 +145,17 @@ export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNo
     }
   }, [onSelectNode, selectedNode?.id]);
 
+  const uniqueModules = useMemo(() => {
+    const mods = new Set<string>();
+    for (const m of nodeMeta.values()) {
+      for (const mod of m.modules) mods.add(mod);
+    }
+    return mods.size;
+  }, [nodeMeta]);
+
+  const selectedNodeName = selectedNode ? (nodeDisplayNames.get(selectedNode.id) ?? humanizeLabel(selectedNode.label)) : "";
+  const selectedMeta = selectedNode ? nodeMeta.get(selectedNode.id) : undefined;
+
   const riskPct = selectedNode ? Math.min(100, Math.round(selectedNode.risk_score)) : 0;
   const riskBarColor = riskPct > 70 ? "var(--risk-high)" : riskPct >= 50 ? "var(--risk-mid)" : "var(--risk-low)";
   const riskExplanation = riskPct > 70
@@ -131,22 +178,27 @@ export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNo
       {graph && (
         <div className={`graph-split ${selectedNode ? "has-detail" : ""}`}>
           <div className="graph-main">
+            {graphMode === "lineage" && graph.nodes.length > 0 && (
+              <p className="graph-dynamic-desc">
+                Shows how {graph.nodes.length} data entit{graph.nodes.length === 1 ? "y" : "ies"} flow across {uniqueModules || "multiple"} module{uniqueModules === 1 ? "" : "s"} in this codebase.
+              </p>
+            )}
             <div className="graph-stats">
               <div>
-                <span>Nodes</span>
+                <span>{graphMode === "lineage" ? "Entities" : "Nodes"}</span>
                 <strong>{graph.nodes.length}</strong>
               </div>
               <div>
-                <span>Edges</span>
+                <span>{graphMode === "lineage" ? "Flows" : "Edges"}</span>
                 <strong>{graph.edges.length}</strong>
               </div>
               <div>
                 <span>Selected</span>
-                <strong>{selectedNode?.label ?? "-"}</strong>
+                <strong>{selectedNodeName || "-"}</strong>
               </div>
             </div>
 
-            <GraphCanvas graph={graph} selectedNodeId={selectedNode?.id ?? null} onSelectNode={setSelectedNodeId} nodeSubtitles={nodeSubtitles} riskOverlay={riskOverlay} showEdgeLabels={showEdgeLabels} />
+            <GraphCanvas graph={graph} selectedNodeId={selectedNode?.id ?? null} onSelectNode={setSelectedNodeId} nodeDisplayNames={nodeDisplayNames} nodeSubtitles={nodeSubtitles} riskOverlay={riskOverlay} showEdgeLabels={showEdgeLabels} />
 
             {graphMode && (
               <div className="graph-legend-wrap">
@@ -177,7 +229,12 @@ export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNo
 
           {selectedNode && (
             <div className="detail-panel">
-              <h3 className="detail-node-name">{humanizeLabel(selectedNode.label)}</h3>
+              <h3 className="detail-node-name">{selectedNodeName}</h3>
+              <p className="detail-node-description">
+                {graphMode === "lineage"
+                  ? `Tracks ${selectedNodeName} data across the system \u2014 how it\u2019s created, read, updated, and deleted`
+                  : nodeDescription(selectedNodeName)}
+              </p>
               <div className="detail-badges">
                 <span className={`node-pill ${selectedNode.node_type}`}>{selectedNode.node_type}</span>
               </div>
@@ -195,6 +252,30 @@ export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNo
                 </div>
               )}
 
+              {graphMode === "lineage" && selectedMeta && selectedMeta.crudOps.length > 0 && (
+                <div className="detail-section">
+                  <span className="detail-section-label">Detected Operations</span>
+                  <div className="crud-ops">
+                    {(["Create", "Read", "Update", "Delete"] as const).map((op) => (
+                      <span key={op} className={`crud-pill ${selectedMeta.crudOps.includes(op) ? "crud-active" : "crud-inactive"}`}>
+                        {op}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {graphMode === "lineage" && selectedMeta && selectedMeta.modules.length > 0 && (
+                <div className="detail-section">
+                  <span className="detail-section-label">Accessed By Modules</span>
+                  <div className="detail-connected">
+                    {selectedMeta.modules.map((mod) => (
+                      <span key={mod} className="node-pill data">{mod}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="detail-section">
                 <span className="detail-section-label">Risk Score</span>
                 <div className="detail-risk-row">
@@ -207,7 +288,7 @@ export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNo
               </div>
 
               <div className="detail-section">
-                <span className="detail-section-label">What This Does</span>
+                <span className="detail-section-label">{graphMode === "lineage" ? "Evidence" : "What This Does"}</span>
                 {evidenceLoading && <p className="muted">Loading...</p>}
                 {!evidenceLoading && !evidence && <p className="muted">No evidence available.</p>}
                 {!evidenceLoading && evidence && (
@@ -241,18 +322,21 @@ export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNo
                 <div className="detail-section">
                   <span className="detail-section-label">Connects To</span>
                   <div className="detail-connected">
-                    {connectedNodeIds.map((id) => (
-                      <span
-                        key={id}
-                        className="node-pill process clickable"
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setSelectedNodeId(id)}
-                        onKeyDown={(e) => { if (e.key === "Enter") setSelectedNodeId(id); }}
-                      >
-                        {humanizeLabel(id)}
-                      </span>
-                    ))}
+                    {connectedNodeIds.map((id) => {
+                      const label = nodeDisplayNames.get(id) ?? humanizeLabel(graph.nodes.find((n) => n.id === id)?.label ?? id);
+                      return (
+                        <span
+                          key={id}
+                          className="node-pill process clickable"
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setSelectedNodeId(id)}
+                          onKeyDown={(e) => { if (e.key === "Enter") setSelectedNodeId(id); }}
+                        >
+                          {label}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               )}

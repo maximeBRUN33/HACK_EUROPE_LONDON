@@ -5,6 +5,7 @@ type GraphCanvasProps = {
   graph: GraphPayload;
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string) => void;
+  nodeDisplayNames?: Map<string, string>;
   nodeSubtitles?: Map<string, string>;
   riskOverlay?: boolean;
   showEdgeLabels?: boolean;
@@ -18,7 +19,7 @@ const LAYER_GAP_Y = 110;
 const NODE_GAP_X = 40;
 const PADDING = 80;
 
-export function GraphCanvas({ graph, selectedNodeId, onSelectNode, nodeSubtitles, riskOverlay, showEdgeLabels }: GraphCanvasProps): JSX.Element {
+export function GraphCanvas({ graph, selectedNodeId, onSelectNode, nodeDisplayNames, nodeSubtitles, riskOverlay, showEdgeLabels }: GraphCanvasProps): JSX.Element {
   const { positions, viewWidth, viewHeight } = useMemo(() => buildLayout(graph), [graph]);
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<{ startX: number; startY: number; startPanX: number; startPanY: number } | null>(null);
@@ -181,10 +182,16 @@ export function GraphCanvas({ graph, selectedNodeId, onSelectNode, nodeSubtitles
           if (!source || !target) return null;
           const midX = (source.x + target.x) / 2;
           const midY = (source.y + target.y) / 2;
+          const label = edge.edge_type === "data" ? "data flow" : edge.edge_type;
+          const pillW = label.length * 7 + 16;
+          const pillH = 20;
           return (
-            <text key={`elabel-${index}`} x={midX + 10} y={midY} className="edge-label" textAnchor="start">
-              {edge.edge_type}
-            </text>
+            <g key={`elabel-${index}`}>
+              <rect x={midX + 6} y={midY - pillH / 2} width={pillW} height={pillH} rx={10} className="edge-label-pill" />
+              <text x={midX + 6 + pillW / 2} y={midY + 4} className="edge-label" textAnchor="middle">
+                {label}
+              </text>
+            </g>
           );
         })}
 
@@ -215,10 +222,10 @@ export function GraphCanvas({ graph, selectedNodeId, onSelectNode, nodeSubtitles
               <rect x={-halfW} y={-halfH} rx={12} ry={12} width={NODE_WIDTH} height={NODE_HEIGHT} />
               <circle cx={halfW - 18} cy={0} r={7} fill={riskColor} opacity={0.85} />
               <text className="node-label" x={-halfW + 16} y={-6} textAnchor="start">
-                {truncate(humanizeLabel(node.label), 30)}
+                {truncate(nodeDisplayNames?.get(node.id) ?? humanizeLabel(node.label), 30)}
               </text>
               <text className="node-subtitle" x={-halfW + 16} y={10} textAnchor="start">
-                {truncate(nodeSubtitles?.get(node.id) ?? inferOperation(node.label) ?? "", 32)}
+                {truncate(nodeSubtitles?.get(node.id) ?? "", 36)}
               </text>
               <text className="node-meta" x={halfW - 32} y={-6} textAnchor="end">
                 {Math.round(node.risk_score)}
@@ -231,27 +238,49 @@ export function GraphCanvas({ graph, selectedNodeId, onSelectNode, nodeSubtitles
   );
 }
 
-function humanizeLabel(label: string): string {
+/** Convert a PascalCase class/function name into a verb-first readable action.
+ *  "SaleCreateView" → "Create Sale", "Risk Aggregator" → "Risk Aggregator" */
+export function humanizeLabel(label: string): string {
+  // Already human-readable (contains spaces and no PascalCase pattern)
+  if (label.includes(" ") && !/[a-z][A-Z]/.test(label)) return label;
+
   const words = label
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
     .replace(/_/g, " ")
     .split(/\s+/);
+
+  // Strip framework suffixes
   const strip = ["View", "Model", "Serializer", "Controller", "Handler", "Manager", "Mixin"];
   if (words.length > 1 && strip.includes(words[words.length - 1])) {
     words.pop();
   }
+
+  // Reorder so verb comes first: ["Sale", "Create"] → ["Create", "Sale"]
+  const verbs = ["Create", "Delete", "Update", "Edit", "Select", "List", "Destroy", "Retrieve"];
+  const verbIdx = words.findIndex((w) => verbs.includes(w));
+  if (verbIdx > 0) {
+    const verb = words.splice(verbIdx, 1)[0];
+    words.unshift(verb);
+  }
+
   return words.join(" ");
 }
 
-function inferOperation(label: string): string | null {
-  const l = label.toLowerCase();
-  if (l.includes("create")) return "POST";
-  if (l.includes("delete") || l.includes("destroy")) return "DELETE";
-  if (l.includes("update") || l.includes("edit")) return "PUT";
-  if (l.includes("list") || l.includes("index")) return "GET";
-  if (l.includes("detail") || l.includes("retrieve")) return "GET";
-  return null;
+/** Generate a one-line business description for a humanized label. */
+export function nodeDescription(readableLabel: string): string {
+  const KNOWN: Record<string, string> = {
+    "Create Sale": "Creates a new sale transaction in the system",
+    "Create Purchase": "Creates a new purchase order",
+    "Delete Stock": "Removes items from inventory",
+    "Purchase Bill": "Records a purchase bill from a supplier",
+    "Sale Bill": "Records a bill for a completed sale",
+    "Select Supplier": "Selects which supplier to order from",
+    "Delete Purchase": "Deletes a purchase record",
+    "Risk Aggregator": "Highlights the highest-risk area in the codebase",
+  };
+  if (KNOWN[readableLabel]) return KNOWN[readableLabel];
+  return `Handles ${readableLabel} operations`;
 }
 
 function truncate(value: string, max: number): string {

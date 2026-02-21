@@ -838,13 +838,16 @@ button:disabled {
 /* Edge labels */
 .edge-label {
   font-size: 9px;
-  fill: var(--ink-low);
+  fill: var(--ink-mid);
   font-family: "JetBrains Mono", monospace;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  paint-order: stroke;
-  stroke: #FFFFFF;
-  stroke-width: 3px;
+  stroke: none;
+}
+.edge-label-pill {
+  fill: #F3F4F6;
+  stroke: #E5E7EB;
+  stroke-width: 1;
 }
 
 .node-label {
@@ -1493,9 +1496,46 @@ button:disabled {
 .detail-node-name {
   margin: 0;
   font-family: "Space Grotesk", sans-serif;
-  font-size: 1.1rem;
+  font-size: 1.25rem;
+  font-weight: 700;
   color: var(--ink-high);
   word-break: break-word;
+}
+
+.detail-node-description {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+  color: var(--ink-mid);
+  line-height: 1.4;
+}
+
+.graph-dynamic-desc {
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  color: var(--ink-mid);
+  line-height: 1.4;
+}
+
+.crud-ops {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.crud-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.crud-active {
+  background: #DBEAFE;
+  color: #1E40AF;
+}
+.crud-inactive {
+  background: #F3F4F6;
+  color: #9CA3AF;
 }
 
 .detail-badges {
