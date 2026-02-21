@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { EvidencePayload, GraphPayload, RiskSummary } from "../lib/api";
+import type { EnrichmentPayload, EvidencePayload, GraphPayload, RiskSummary } from "../lib/api";
 import { fetchNodeEvidence } from "../lib/api";
 import { GraphCanvas } from "./GraphCanvas";
 
@@ -13,9 +13,10 @@ type GraphPanelProps = {
   riskOverlay?: boolean;
   showEdgeLabels?: boolean;
   riskSummary?: RiskSummary | null;
+  enrichment?: EnrichmentPayload | null;
 };
 
-export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNode, focusedNodeId, riskOverlay, showEdgeLabels, riskSummary }: GraphPanelProps): JSX.Element {
+export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNode, focusedNodeId, riskOverlay, showEdgeLabels, riskSummary, enrichment }: GraphPanelProps): JSX.Element {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [nodeSubtitles, setNodeSubtitles] = useState<Map<string, string>>(new Map());
 
@@ -192,6 +193,29 @@ export function GraphPanel({ title, graph, evidence, evidenceLoading, onSelectNo
                   </div>
                 </div>
               )}
+
+              {enrichment && enrichment.ontology_enrichment && Object.keys(enrichment.ontology_enrichment).length > 0 && (() => {
+                const ont = enrichment.ontology_enrichment;
+                const nodeKey = selectedNode.label;
+                const nodeData = (ont[nodeKey] ?? ont[selectedNode.id]) as Record<string, unknown> | undefined;
+                const entries: [string, string][] = nodeData
+                  ? Object.entries(nodeData).map(([k, v]) => [k, String(v)])
+                  : [];
+                if (entries.length === 0) return null;
+                return (
+                  <div className="detail-section">
+                    <span className="detail-section-label">Ontology Enrichment</span>
+                    <dl className="ontology-dl">
+                      {entries.map(([k, v]) => (
+                        <div key={k} className="ontology-entry">
+                          <dt>{k}</dt>
+                          <dd>{v}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                );
+              })()}
 
               {relevantFindings.length > 0 && (
                 <div className="detail-section">

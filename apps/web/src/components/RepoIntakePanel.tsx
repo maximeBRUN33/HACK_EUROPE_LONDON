@@ -47,9 +47,9 @@ const FEATURES = [
 ] as const;
 
 export function RepoIntakePanel({ isBusy, run, dustConfigured, codewordsConfigured, onStart }: RepoIntakePanelProps): JSX.Element {
-  const [repoUrl, setRepoUrl] = useState("https://github.com/frappe/erpnext");
-  const [commitSha, setCommitSha] = useState("hackathon-seed");
-  const [localPath, setLocalPath] = useState("");
+  const [repoUrl, setRepoUrl] = useState("https://github.com/akashroshan135/inventory-management.git");
+  const [commitSha, setCommitSha] = useState("main");
+  const [localPath, setLocalPath] = useState("/Users/alessandrocondorelli/inventory-management");
   const [error, setError] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -113,15 +113,6 @@ export function RepoIntakePanel({ isBusy, run, dustConfigured, codewordsConfigur
           Meet <strong>Legacy Atlas</strong>
         </h1>
         <p className="ll-subtitle">AI-powered legacy code comprehension.</p>
-      </div>
-
-      <div className="ll-features">
-        {FEATURES.map((f) => (
-          <div key={f.label} className="ll-feature">
-            <span className="ll-feature-icon">{f.icon}</span>
-            <span className="ll-feature-label">{f.label}</span>
-          </div>
-        ))}
       </div>
 
       <div className="ll-input-card">

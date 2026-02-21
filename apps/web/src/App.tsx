@@ -10,11 +10,13 @@ import {
   fetchMcpStatus,
   fetchNodeEvidence,
   fetchRiskSummary,
+  fetchRunEnrichment,
   fetchRunStatus,
   fetchWorkflowGraph,
   registerRepository,
   startScan,
   type CopilotResponse,
+  type EnrichmentPayload,
   type EvidencePayload,
   type GraphPayload,
   type RepoResponse,
@@ -30,6 +32,7 @@ type AppState = {
   workflowEvidence: EvidencePayload | null;
   lineageEvidence: EvidencePayload | null;
   riskSummary: RiskSummary | null;
+  enrichment: EnrichmentPayload | null;
   copilot: CopilotResponse | null;
 };
 
@@ -41,6 +44,7 @@ const initialState: AppState = {
   workflowEvidence: null,
   lineageEvidence: null,
   riskSummary: null,
+  enrichment: null,
   copilot: null
 };
 
@@ -87,10 +91,11 @@ export function App(): JSX.Element {
         setState((current) => ({ ...current, run }));
       });
 
-      const [workflowGraph, lineageGraph, riskSummary] = await Promise.all([
+      const [workflowGraph, lineageGraph, riskSummary, enrichment] = await Promise.all([
         fetchWorkflowGraph(completedRun.id),
         fetchLineageGraph(completedRun.id),
-        fetchRiskSummary(completedRun.id)
+        fetchRiskSummary(completedRun.id),
+        fetchRunEnrichment(completedRun.id).catch(() => null)
       ]);
 
       setState((current) => ({
@@ -102,6 +107,7 @@ export function App(): JSX.Element {
         workflowEvidence: null,
         lineageEvidence: null,
         riskSummary,
+        enrichment,
         copilot: null
       }));
 
@@ -271,6 +277,7 @@ export function App(): JSX.Element {
             onSelectNode={handleSelectWorkflowNode}
             focusedNodeId={focusedNodeId}
             riskSummary={state.riskSummary}
+            enrichment={state.enrichment}
           />
         )}
 
@@ -298,7 +305,7 @@ export function App(): JSX.Element {
               focusedNodeId={focusedNodeId}
               riskSummary={state.riskSummary}
             />
-            <RiskPanel summary={state.riskSummary} />
+            <RiskPanel summary={state.riskSummary} enrichment={state.enrichment} />
           </>
         )}
 
