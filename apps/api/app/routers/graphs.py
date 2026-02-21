@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
+from app.errors import api_error
 from app.models import EnrichmentPayload, EvidencePayload, GraphPayload, MigrationBlueprintPayload, RiskSummaryPayload
 from app.services.migration_blueprint import build_migration_blueprint
 from app.store import store
@@ -11,7 +12,7 @@ router = APIRouter(prefix="/api/runs", tags=["graphs"])
 def get_workflow_graph(run_id: str) -> GraphPayload:
     graph = store.get_workflow_graph(run_id)
     if graph is None:
-        raise HTTPException(status_code=404, detail="Workflow graph not found")
+        raise api_error(status_code=404, detail_code="WORKFLOW_GRAPH_NOT_FOUND", message="Workflow graph not found")
     return graph
 
 
@@ -19,7 +20,7 @@ def get_workflow_graph(run_id: str) -> GraphPayload:
 def get_lineage_graph(run_id: str) -> GraphPayload:
     graph = store.get_lineage_graph(run_id)
     if graph is None:
-        raise HTTPException(status_code=404, detail="Lineage graph not found")
+        raise api_error(status_code=404, detail_code="LINEAGE_GRAPH_NOT_FOUND", message="Lineage graph not found")
     return graph
 
 
@@ -27,7 +28,7 @@ def get_lineage_graph(run_id: str) -> GraphPayload:
 def get_risk_summary(run_id: str) -> RiskSummaryPayload:
     summary = store.get_risk_summary(run_id)
     if summary is None:
-        raise HTTPException(status_code=404, detail="Risk summary not found")
+        raise api_error(status_code=404, detail_code="RISK_SUMMARY_NOT_FOUND", message="Risk summary not found")
     return summary
 
 
@@ -35,11 +36,11 @@ def get_risk_summary(run_id: str) -> RiskSummaryPayload:
 def get_node_evidence(run_id: str, node_id: str) -> EvidencePayload:
     run = store.get_run(run_id)
     if run is None:
-        raise HTTPException(status_code=404, detail="Run not found")
+        raise api_error(status_code=404, detail_code="RUN_NOT_FOUND", message="Run not found")
 
     payload = store.get_evidence(run_id, node_id)
     if payload is None:
-        raise HTTPException(status_code=404, detail="Evidence not found for node")
+        raise api_error(status_code=404, detail_code="EVIDENCE_NOT_FOUND", message="Evidence not found for node")
     return payload
 
 
@@ -47,11 +48,11 @@ def get_node_evidence(run_id: str, node_id: str) -> EvidencePayload:
 def get_run_enrichment(run_id: str) -> EnrichmentPayload:
     run = store.get_run(run_id)
     if run is None:
-        raise HTTPException(status_code=404, detail="Run not found")
+        raise api_error(status_code=404, detail_code="RUN_NOT_FOUND", message="Run not found")
 
     payload = store.get_enrichment(run_id)
     if payload is None:
-        raise HTTPException(status_code=404, detail="Enrichment not found")
+        raise api_error(status_code=404, detail_code="ENRICHMENT_NOT_FOUND", message="Enrichment not found")
     return payload
 
 
@@ -59,12 +60,16 @@ def get_run_enrichment(run_id: str) -> EnrichmentPayload:
 def get_migration_blueprint(run_id: str) -> MigrationBlueprintPayload:
     run = store.get_run(run_id)
     if run is None:
-        raise HTTPException(status_code=404, detail="Run not found")
+        raise api_error(status_code=404, detail_code="RUN_NOT_FOUND", message="Run not found")
 
     risk = store.get_risk_summary(run_id)
     lineage = store.get_lineage_graph(run_id)
     if risk is None or lineage is None:
-        raise HTTPException(status_code=400, detail="Run exists but migration artifacts are not ready")
+        raise api_error(
+            status_code=400,
+            detail_code="MIGRATION_ARTIFACTS_NOT_READY",
+            message="Run exists but migration artifacts are not ready",
+        )
 
     enrichment = store.get_enrichment(run_id)
     return build_migration_blueprint(run=run, risk_summary=risk, lineage_graph=lineage, enrichment=enrichment)

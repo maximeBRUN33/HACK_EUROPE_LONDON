@@ -104,6 +104,7 @@ Or use Make:
 ```bash
 make api-install && make api-run    # Terminal 1
 make web-install && make web-run    # Terminal 2
+make api-smoke                      # Backend smoke flow (no frontend required)
 ```
 
 ## API Endpoints (16)
@@ -179,7 +180,7 @@ pip install -e .[dev]
 pytest
 ```
 
-10 tests covering health check, end-to-end scan + graph generation, migration blueprint endpoint, manual API flow parity, copilot paths, ingestion branch resolution, MCP/Dust status, integrations readiness, and fallback mode.
+19 tests covering health check, end-to-end scan + graph generation, migration blueprint endpoint, manual API flow parity, Dust fallback matrix, copilot paths, ingestion branch resolution, API error detail codes, MCP/Dust status, integrations readiness, and fallback mode.
 
 ## Repository Structure
 ```

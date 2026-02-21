@@ -1,8 +1,9 @@
 import logging
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
+from app.errors import api_error
 from app.models import AnalysisRun, Repository, RepositoryRegisterRequest, ScanRequest
 from app.services.analysis import create_placeholder_summary
 from app.services.jobs import enqueue_analysis
@@ -25,7 +26,7 @@ def register_repository(payload: RepositoryRegisterRequest) -> Repository:
     try:
         owner, name = _parse_owner_and_name(str(payload.repo_url))
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise api_error(status_code=400, detail_code="INVALID_REPOSITORY_URL", message=str(exc)) from exc
 
     repository = Repository(
         owner=owner,
@@ -50,7 +51,7 @@ def register_repository(payload: RepositoryRegisterRequest) -> Repository:
 def start_scan(repo_id: str, payload: ScanRequest) -> AnalysisRun:
     repository = store.get_repository(repo_id)
     if repository is None:
-        raise HTTPException(status_code=404, detail="Repository not found")
+        raise api_error(status_code=404, detail_code="REPOSITORY_NOT_FOUND", message="Repository not found")
 
     run = AnalysisRun(repository_id=repository.id, commit_sha=payload.commit_sha)
     run.summary = create_placeholder_summary(repository, payload.commit_sha)
@@ -73,6 +74,6 @@ def start_scan(repo_id: str, payload: ScanRequest) -> AnalysisRun:
 def get_run_status(repo_id: str, run_id: str) -> AnalysisRun:
     run = store.get_run_for_repository(repo_id, run_id)
     if run is None:
-        raise HTTPException(status_code=404, detail="Run not found")
+        raise api_error(status_code=404, detail_code="RUN_NOT_FOUND", message="Run not found")
     logger.debug("Run status requested run_id=%s repo_id=%s status=%s step=%s progress=%.1f", run_id, repo_id, run.status, run.current_step, run.progress_pct)
     return run

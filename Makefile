@@ -1,4 +1,4 @@
-.PHONY: api-install api-run api-run-debug api-test web-install web-run
+.PHONY: api-install api-run api-run-debug api-test api-test-logs api-smoke web-install web-run
 
 API_PORT ?= 8000
 LOG_LEVEL ?= INFO
@@ -15,6 +15,12 @@ api-run-debug:
 
 api-test:
 	cd apps/api && python3 -m pytest -q
+
+api-test-logs:
+	cd apps/api && pytest -s -o log_cli=true -o log_cli_level=INFO
+
+api-smoke:
+	cd apps/api && pytest -s -k test_manual_cli_flow_sequence -o log_cli=true -o log_cli_level=INFO
 
 web-install:
 	cd apps/web && npm install

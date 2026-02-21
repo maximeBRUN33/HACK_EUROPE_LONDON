@@ -29,6 +29,21 @@ The API auto-loads variables from `apps/api/.env` at startup (existing shell env
 - `GET /api/integrations/dust/status`
 - `GET /api/integrations/readiness`
 
+## Error response shape
+
+API errors now include stable codes for frontend handling:
+
+```json
+{
+  "detail": {
+    "detail_code": "RUN_NOT_FOUND",
+    "message": "Run not found"
+  }
+}
+```
+
+`detail_code` is additive and stable across endpoint responses.
+
 ## Real AST mode
 
 Set `local_path` when calling `POST /api/repos/register` to analyze a local Python clone.
@@ -86,3 +101,11 @@ LEGACY_ATLAS_LOG_LEVEL=DEBUG uvicorn app.main:app --reload --port 8000
 ```
 
 This will print run lifecycle logs (ingestion, AST parsing, graph/risk build, artifact persistence, Dust/CodeWords calls) directly in terminal.
+
+## Smoke and test commands
+
+```bash
+make api-smoke       # one-command backend smoke flow with logs
+make api-test        # fast test run
+make api-test-logs   # full tests with live logs
+```

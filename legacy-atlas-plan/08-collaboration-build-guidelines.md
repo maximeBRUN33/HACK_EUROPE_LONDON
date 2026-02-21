@@ -203,7 +203,29 @@ Completed by Role A:
 - Copilot remains Dust-first and now passes CodeWords enrichment context to improve grounded responses.
 - Migration blueprint endpoint is available on `GET /api/runs/{run_id}/migration-blueprint`.
 - Integration readiness endpoint is available on `GET /api/integrations/readiness`.
+- Stable API error shape with additive `detail.detail_code` is in place for frontend handling.
+- One-command backend smoke flow is available via `make api-smoke`.
 
 Next for Role B:
 - Consume `GET /api/runs/{run_id}/enrichment` and surface `ontology_enrichment`, `migration_hints`, and `quality_checks`.
 - Keep endpoint usage additive-only per freeze rules.
+
+## 11) Partner 2 Handoff (Start Here)
+
+Use these backend endpoints as the immediate UI integration base:
+
+1. `GET /api/runs/{run_id}/enrichment`
+2. `GET /api/runs/{run_id}/migration-blueprint`
+3. `GET /api/integrations/readiness`
+
+Render and state-handling requirements:
+- Enrichment panel: show `status`, `ontology_enrichment`, `migration_hints`, `quality_checks`.
+- Migration panel: show `readiness_score`, `readiness_band`, `top_risks`, `phased_plan`.
+- Integration badges: show `configured`, `reachable`, and optional `latency_ms`.
+
+Error handling contract:
+- API errors now include `detail.detail_code` and `detail.message`.
+- UI should branch by `detail_code` for reliable messages and fallback UX.
+
+Validation command before frontend PR:
+- `make api-smoke` must pass on latest `main`.

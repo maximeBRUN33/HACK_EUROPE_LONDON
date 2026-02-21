@@ -1,7 +1,8 @@
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
+from app.errors import api_error
 from app.models import CopilotCitation, CopilotRequest, CopilotResponse
 from app.services.dust_client import DustClient
 from app.store import store
@@ -15,16 +16,20 @@ def query_copilot(payload: CopilotRequest) -> CopilotResponse:
     logger.info("Copilot query received run_id=%s focus_node=%s", payload.run_id, payload.focus_node_id or "auto")
     run = store.get_run(str(payload.run_id))
     if run is None:
-        raise HTTPException(status_code=404, detail="Run not found")
+        raise api_error(status_code=404, detail_code="RUN_NOT_FOUND", message="Run not found")
 
     risk = store.get_risk_summary(str(payload.run_id))
     graph = store.get_workflow_graph(str(payload.run_id))
     enrichment = store.get_enrichment(str(payload.run_id))
 
     if risk is None or graph is None:
-        raise HTTPException(status_code=400, detail="Run exists but semantic artifacts are not ready")
+        raise api_error(
+            status_code=400,
+            detail_code="SEMANTIC_ARTIFACTS_NOT_READY",
+            message="Run exists but semantic artifacts are not ready",
+        )
     if not graph.nodes:
-        raise HTTPException(status_code=400, detail="Graph is empty for this run")
+        raise api_error(status_code=400, detail_code="EMPTY_WORKFLOW_GRAPH", message="Graph is empty for this run")
 
     focus = payload.focus_node_id or graph.nodes[0].id
     focus_evidence = store.get_evidence(str(payload.run_id), focus)

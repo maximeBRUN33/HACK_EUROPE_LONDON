@@ -3,9 +3,10 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
+from app.errors import api_error
 from app.integrations.mcp import load_mcp_config, safe_mcp_summary
 from app.models import (
     CodeWordsResultResponse,
@@ -32,13 +33,22 @@ def get_mcp_status() -> dict:
 def trigger_codewords(payload: CodeWordsTriggerRequest) -> CodeWordsTriggerResponse:
     client = CodeWordsClient()
     if not client.is_configured():
-        raise HTTPException(status_code=503, detail="CodeWords integration is not configured")
+        raise api_error(
+            status_code=503,
+            detail_code="CODEWORDS_NOT_CONFIGURED",
+            message="CodeWords integration is not configured",
+        )
 
     try:
         response = client.trigger(service_id=payload.service_id, inputs=payload.inputs, async_mode=payload.async_mode)
     except RuntimeError as exc:
         logger.warning("CodeWords trigger failed service_id=%s error=%s", payload.service_id, exc)
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise api_error(
+            status_code=502,
+            detail_code="CODEWORDS_TRIGGER_FAILED",
+            message=str(exc),
+            provider="codewords",
+        ) from exc
 
     logger.info(
         "CodeWords triggered service_id=%s async=%s status=%s request_id=%s",
@@ -59,13 +69,22 @@ def trigger_codewords(payload: CodeWordsTriggerRequest) -> CodeWordsTriggerRespo
 def poll_codewords_result(request_id: str) -> CodeWordsResultResponse:
     client = CodeWordsClient()
     if not client.is_configured():
-        raise HTTPException(status_code=503, detail="CodeWords integration is not configured")
+        raise api_error(
+            status_code=503,
+            detail_code="CODEWORDS_NOT_CONFIGURED",
+            message="CodeWords integration is not configured",
+        )
 
     try:
         response = client.poll_result(request_id=request_id)
     except RuntimeError as exc:
         logger.warning("CodeWords poll failed request_id=%s error=%s", request_id, exc)
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise api_error(
+            status_code=502,
+            detail_code="CODEWORDS_POLL_FAILED",
+            message=str(exc),
+            provider="codewords",
+        ) from exc
 
     logger.info("CodeWords poll request_id=%s status=%s", request_id, response.status)
     return CodeWordsResultResponse(

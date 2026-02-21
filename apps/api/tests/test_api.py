@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
+from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 os.environ["LEGACY_ATLAS_SYNC_JOBS"] = "1"
@@ -188,12 +190,20 @@ def test_manual_cli_flow_sequence(tmp_path: Path) -> None:
     lineage = client.get(f"/api/runs/{run['id']}/lineage-graph")
     risk = client.get(f"/api/runs/{run['id']}/risk-summary")
     enrichment = client.get(f"/api/runs/{run['id']}/enrichment")
+    blueprint = client.get(f"/api/runs/{run['id']}/migration-blueprint")
+    readiness = client.get("/api/integrations/readiness")
 
     assert workflow.status_code == 200
     assert lineage.status_code == 200
     assert risk.status_code == 200
     assert enrichment.status_code == 200
+    assert blueprint.status_code == 200
+    assert readiness.status_code == 200
     assert enrichment.json()["status"] == "disabled"
+    assert len(blueprint.json()["phased_plan"]) == 3
+    assert "codewords" in readiness.json()
+    assert "dust" in readiness.json()
+    assert "mcp" in readiness.json()
 
     first_node = workflow.json()["nodes"][0]["id"]
     evidence = client.get(f"/api/runs/{run['id']}/node/{first_node}/evidence")
@@ -248,6 +258,31 @@ def test_integrations_readiness_endpoint(monkeypatch) -> None:
     assert payload["mcp"]["reachable"] is True
 
 
+def test_error_response_includes_detail_code_for_missing_run() -> None:
+    run_id = str(uuid4())
+    response = client.get(f"/api/runs/{run_id}/migration-blueprint")
+    assert response.status_code == 404
+    payload = response.json()
+    assert isinstance(payload.get("detail"), dict)
+    assert payload["detail"]["detail_code"] == "RUN_NOT_FOUND"
+    assert "message" in payload["detail"]
+
+
+def test_codewords_trigger_unconfigured_returns_detail_code(monkeypatch) -> None:
+    class FakeCodeWords:
+        def is_configured(self) -> bool:
+            return False
+
+    monkeypatch.setattr("app.routers.integrations.CodeWordsClient", FakeCodeWords)
+    response = client.post(
+        "/api/integrations/codewords/trigger",
+        json={"service_id": "test", "inputs": {}, "async_mode": True},
+    )
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["detail"]["detail_code"] == "CODEWORDS_NOT_CONFIGURED"
+
+
 def test_copilot_returns_citations(tmp_path: Path) -> None:
     _build_sample_python_repo(tmp_path)
     repo = client.post(
@@ -276,6 +311,60 @@ def test_copilot_returns_citations(tmp_path: Path) -> None:
     assert "risk_implications" in payload
     assert isinstance(payload["risk_implications"], list)
     assert "related_nodes" in payload
+    assert isinstance(payload["related_nodes"], list)
+
+
+@pytest.mark.parametrize(
+    "mode,error_text",
+    [
+        ("raise", "Dust response timeout"),
+        ("raise", "Dust returned non-JSON response"),
+        ("raise", "Dust HTTP error 502: bad gateway"),
+        ("raise", "Dust network error: connection reset"),
+        ("empty", ""),
+    ],
+)
+def test_copilot_dust_failure_modes_fallback(monkeypatch, tmp_path: Path, mode: str, error_text: str) -> None:
+    _build_sample_python_repo(tmp_path)
+    repo = client.post(
+        "/api/repos/register",
+        json={
+            "repo_url": "https://github.com/odoo/odoo",
+            "default_branch": "master",
+            "local_path": str(tmp_path),
+        },
+    ).json()
+    run = client.post(
+        f"/api/repos/{repo['id']}/scan",
+        json={"commit_sha": "seed-dust-fallback"},
+    ).json()
+
+    class FakeDust:
+        def is_configured(self) -> bool:
+            return True
+
+        def semantic_copilot(self, *, question: str, context: dict) -> DustSemanticResponse:
+            if mode == "empty":
+                return DustSemanticResponse(
+                    answer="",
+                    citations=[],
+                    risk_implications=[],
+                    related_nodes=[],
+                    raw_text="{}",
+                )
+            raise RuntimeError(error_text)
+
+    monkeypatch.setattr("app.routers.copilot.DustClient", FakeDust)
+
+    response = client.post(
+        "/api/copilot/query",
+        json={"run_id": run["id"], "question": "What breaks if I edit lead assignment?"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert "Primary impact area" in payload["answer"]
+    assert len(payload["citations"]) >= 1
+    assert isinstance(payload["risk_implications"], list)
     assert isinstance(payload["related_nodes"], list)
 
 
