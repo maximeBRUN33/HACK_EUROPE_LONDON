@@ -125,6 +125,37 @@ def test_end_to_end_scan_and_graphs(tmp_path: Path) -> None:
     assert run["summary"]["analysis_mode"] == "ast-local"
 
 
+def test_migration_blueprint_endpoint(tmp_path: Path) -> None:
+    _build_sample_python_repo(tmp_path)
+    repo = client.post(
+        "/api/repos/register",
+        json={
+            "repo_url": "https://github.com/frappe/erpnext",
+            "default_branch": "develop",
+            "local_path": str(tmp_path),
+        },
+    ).json()
+
+    run = client.post(
+        f"/api/repos/{repo['id']}/scan",
+        json={"commit_sha": "blueprint-001"},
+    ).json()
+
+    response = client.get(f"/api/runs/{run['id']}/migration-blueprint")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["run_id"] == run["id"]
+    assert payload["analysis_mode"] in {"ast-local", "fallback"}
+    assert payload["readiness_band"] in {"low", "medium", "high"}
+    assert isinstance(payload["entities"], list)
+    assert isinstance(payload["impacted_modules"], list)
+    assert isinstance(payload["integration_routing"], dict)
+    assert isinstance(payload["top_risks"], list)
+    assert isinstance(payload["recommendations"], list)
+    assert isinstance(payload["phased_plan"], list)
+    assert len(payload["phased_plan"]) == 3
+
+
 def test_manual_cli_flow_sequence(tmp_path: Path) -> None:
     _build_sample_python_repo(tmp_path)
     register = client.post(
@@ -182,6 +213,39 @@ def test_manual_cli_flow_sequence(tmp_path: Path) -> None:
     assert isinstance(copilot_payload["citations"], list) and len(copilot_payload["citations"]) >= 1
     assert isinstance(copilot_payload["risk_implications"], list)
     assert isinstance(copilot_payload["related_nodes"], list)
+
+
+def test_integrations_readiness_endpoint(monkeypatch) -> None:
+    class FakeCodeWords:
+        base_url = "https://runtime.codewords.ai"
+
+        def is_configured(self) -> bool:
+            return True
+
+    class FakeDust:
+        base_url = "https://dust.tt/api/v1"
+
+        def is_configured(self) -> bool:
+            return True
+
+    monkeypatch.setattr("app.routers.integrations.CodeWordsClient", FakeCodeWords)
+    monkeypatch.setattr("app.routers.integrations.DustClient", FakeDust)
+    monkeypatch.setattr(
+        "app.routers.integrations.load_mcp_config",
+        lambda: {"exists": True, "mcpServers": {"CodeWords": {"url": "https://runtime.codewords.ai/run/devx_mcp/mcp/"}}},
+    )
+    monkeypatch.setattr("app.routers.integrations._probe_url", lambda _url, timeout_sec=4.0: (True, 12, None))
+
+    response = client.get("/api/integrations/readiness")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["codewords"]["configured"] is True
+    assert payload["codewords"]["reachable"] is True
+    assert payload["codewords"]["latency_ms"] == 12
+    assert payload["dust"]["configured"] is True
+    assert payload["dust"]["reachable"] is True
+    assert payload["mcp"]["configured"] is True
+    assert payload["mcp"]["reachable"] is True
 
 
 def test_copilot_returns_citations(tmp_path: Path) -> None:

@@ -59,11 +59,13 @@ For this sprint, these endpoints are **frozen** and both roles should treat resp
 6. `GET /api/runs/{run_id}/risk-summary`
 7. `GET /api/runs/{run_id}/node/{node_id}/evidence`
 8. `GET /api/runs/{run_id}/enrichment`
-9. `POST /api/copilot/query`
-10. `GET /api/integrations/mcp/status`
-11. `POST /api/integrations/codewords/trigger`
-12. `GET /api/integrations/codewords/result/{request_id}`
-13. `GET /api/integrations/dust/status`
+9. `GET /api/runs/{run_id}/migration-blueprint`
+10. `POST /api/copilot/query`
+11. `GET /api/integrations/mcp/status`
+12. `POST /api/integrations/codewords/trigger`
+13. `GET /api/integrations/codewords/result/{request_id}`
+14. `GET /api/integrations/dust/status`
+15. `GET /api/integrations/readiness`
 
 Contract rules:
 - No renaming of existing keys in current payloads.
@@ -85,11 +87,13 @@ Contract rules:
 | `GET /api/runs/{run_id}/risk-summary` | path params | `run_id`, `overall_score`, `findings[]` | Role A | Risk and migration panel |
 | `GET /api/runs/{run_id}/node/{node_id}/evidence` | path params | `run_id`, `node_id`, `files[]`, `symbols[]`, `explanation` | Role A | Evidence drawer |
 | `GET /api/runs/{run_id}/enrichment` | path params | `run_id`, `provider`, `status`, `service_id`, `request_id`, `ontology_enrichment`, `migration_hints`, `quality_checks`, `raw` | Role A | Ontology/migration enrichment panel |
+| `GET /api/runs/{run_id}/migration-blueprint` | path params | `run_id`, `readiness_score`, `readiness_band`, `entities`, `impacted_modules`, `extraction_boundaries`, `integration_routing`, `top_risks`, `recommendations`, `phased_plan` | Role A | Migration planning panel |
 | `POST /api/copilot/query` | `run_id`, `question`, `focus_node_id?` | `answer`, `citations[]`, `risk_implications[]`, `related_nodes[]` | Role A | Developer enablement assistant |
 | `GET /api/integrations/mcp/status` | none | `source`, `exists`, `servers` | Role A | Integration badges |
 | `POST /api/integrations/codewords/trigger` | `service_id`, `inputs`, `async_mode` | `provider`, `service_id`, `status`, `request_id`, `raw` | Role A | Backend integration checks |
 | `GET /api/integrations/codewords/result/{request_id}` | path params | `provider`, `request_id`, `status`, `raw` | Role A | Backend integration checks |
 | `GET /api/integrations/dust/status` | none | `configured`, `workspace_id`, `configuration_id` | Role A | Integration badges |
+| `GET /api/integrations/readiness` | none | `checked_at`, `codewords{configured,reachable,latency_ms,detail}`, `dust{...}`, `mcp{...}` | Role A | Integration health badges + debug panel |
 
 Rules for avoiding merge issues:
 - Role B can consume all endpoints but cannot change request/response shapes directly.
@@ -195,6 +199,10 @@ Completed by Role A:
 - CodeWords runtime hook is executed from the post-analysis path.
 - Analysis summary contract is normalized before CodeWords calls (`analysis_mode`, graph/risk counters, scan counters).
 - CodeWords enrichment is persisted as a dedicated artifact and exposed on `GET /api/runs/{run_id}/enrichment`.
+- Ingestion now auto-resolves effective branch and surfaces `ingestion_branch` telemetry in run summary.
+- Copilot remains Dust-first and now passes CodeWords enrichment context to improve grounded responses.
+- Migration blueprint endpoint is available on `GET /api/runs/{run_id}/migration-blueprint`.
+- Integration readiness endpoint is available on `GET /api/integrations/readiness`.
 
 Next for Role B:
 - Consume `GET /api/runs/{run_id}/enrichment` and surface `ontology_enrichment`, `migration_hints`, and `quality_checks`.

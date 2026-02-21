@@ -1,10 +1,19 @@
 import logging
+import time
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.integrations.mcp import load_mcp_config, safe_mcp_summary
-from app.models import CodeWordsResultResponse, CodeWordsTriggerRequest, CodeWordsTriggerResponse
+from app.models import (
+    CodeWordsResultResponse,
+    CodeWordsTriggerRequest,
+    CodeWordsTriggerResponse,
+    IntegrationProviderReadiness,
+    IntegrationReadinessResponse,
+)
 from app.services.codewords_client import CodeWordsClient
 from app.services.dust_client import DustClient
 
@@ -81,3 +90,86 @@ def get_dust_status() -> DustStatusResponse:
         workspace_id=client.workspace_id or None,
         configuration_id=client.configuration_id or None,
     )
+
+
+@router.get("/readiness", response_model=IntegrationReadinessResponse)
+def get_integrations_readiness() -> IntegrationReadinessResponse:
+    codewords = _codewords_readiness()
+    dust = _dust_readiness()
+    mcp = _mcp_readiness()
+    logger.info(
+        "Integration readiness codewords=%s dust=%s mcp=%s",
+        codewords.reachable,
+        dust.reachable,
+        mcp.reachable,
+    )
+    return IntegrationReadinessResponse(codewords=codewords, dust=dust, mcp=mcp)
+
+
+def _codewords_readiness() -> IntegrationProviderReadiness:
+    client = CodeWordsClient()
+    if not client.is_configured():
+        return IntegrationProviderReadiness(configured=False, reachable=False, detail="codewords_not_configured")
+    reachable, latency_ms, detail = _probe_url(f"{client.base_url}/health")
+    return IntegrationProviderReadiness(
+        configured=True,
+        reachable=reachable,
+        latency_ms=latency_ms,
+        detail=detail or "ok",
+    )
+
+
+def _dust_readiness() -> IntegrationProviderReadiness:
+    client = DustClient()
+    if not client.is_configured():
+        return IntegrationProviderReadiness(configured=False, reachable=False, detail="dust_not_configured")
+    reachable, latency_ms, detail = _probe_url(client.base_url)
+    return IntegrationProviderReadiness(
+        configured=True,
+        reachable=reachable,
+        latency_ms=latency_ms,
+        detail=detail or "ok",
+    )
+
+
+def _mcp_readiness() -> IntegrationProviderReadiness:
+    config = load_mcp_config()
+    servers = config.get("mcpServers", {})
+    if not config.get("exists") or not isinstance(servers, dict) or not servers:
+        return IntegrationProviderReadiness(configured=False, reachable=False, detail="mcp_config_missing")
+
+    http_urls: list[str] = []
+    for server in servers.values():
+        if not isinstance(server, dict):
+            continue
+        url = server.get("url")
+        if isinstance(url, str) and url.startswith(("http://", "https://")):
+            http_urls.append(url)
+
+    if not http_urls:
+        return IntegrationProviderReadiness(configured=True, reachable=True, detail="mcp_config_loaded_no_http_probe")
+
+    probe_target = http_urls[0]
+    reachable, latency_ms, detail = _probe_url(probe_target)
+    return IntegrationProviderReadiness(
+        configured=True,
+        reachable=reachable,
+        latency_ms=latency_ms,
+        detail=detail or f"probe:{probe_target}",
+    )
+
+
+def _probe_url(url: str, timeout_sec: float = 4.0) -> tuple[bool, int | None, str | None]:
+    start = time.perf_counter()
+    request = Request(url=url, method="GET")
+    try:
+        with urlopen(request, timeout=timeout_sec) as response:  # noqa: S310
+            _ = response.read(1)
+        elapsed_ms = int((time.perf_counter() - start) * 1000)
+        return True, elapsed_ms, None
+    except HTTPError as exc:
+        elapsed_ms = int((time.perf_counter() - start) * 1000)
+        # HTTP responses still prove network/path reachability.
+        return True, elapsed_ms, f"http_{exc.code}"
+    except URLError as exc:
+        return False, None, str(exc.reason)

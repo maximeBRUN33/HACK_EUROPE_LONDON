@@ -150,3 +150,43 @@ class EnrichmentPayload(BaseModel):
     migration_hints: dict = Field(default_factory=dict)
     quality_checks: dict = Field(default_factory=dict)
     raw: dict = Field(default_factory=dict)
+
+
+class MigrationBlueprintPhase(BaseModel):
+    phase_id: str
+    title: str
+    objective: str
+    actions: list[str] = Field(default_factory=list)
+    success_criteria: list[str] = Field(default_factory=list)
+    impacted_modules: list[str] = Field(default_factory=list)
+    risk_watch: list[str] = Field(default_factory=list)
+
+
+class MigrationBlueprintPayload(BaseModel):
+    run_id: UUID
+    analysis_mode: str
+    readiness_score: float
+    readiness_band: Literal["low", "medium", "high"]
+    entities: list[str] = Field(default_factory=list)
+    impacted_modules: list[str] = Field(default_factory=list)
+    extraction_boundaries: list[dict] = Field(default_factory=list)
+    integration_routing: dict = Field(default_factory=dict)
+    top_risks: list[dict] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
+    phased_plan: list[MigrationBlueprintPhase] = Field(default_factory=list)
+    enrichment_status: str | None = None
+    generated_at: datetime = Field(default_factory=utc_now)
+
+
+class IntegrationProviderReadiness(BaseModel):
+    configured: bool
+    reachable: bool
+    latency_ms: int | None = None
+    detail: str | None = None
+
+
+class IntegrationReadinessResponse(BaseModel):
+    checked_at: datetime = Field(default_factory=utc_now)
+    codewords: IntegrationProviderReadiness
+    dust: IntegrationProviderReadiness
+    mcp: IntegrationProviderReadiness

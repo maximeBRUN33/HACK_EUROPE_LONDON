@@ -106,7 +106,7 @@ make api-install && make api-run    # Terminal 1
 make web-install && make web-run    # Terminal 2
 ```
 
-## API Endpoints (14)
+## API Endpoints (16)
 
 | Endpoint | Purpose |
 |---|---|
@@ -118,9 +118,11 @@ make web-install && make web-run    # Terminal 2
 | `GET /api/runs/{id}/risk-summary` | Risk findings with migration suggestions |
 | `GET /api/runs/{id}/node/{id}/evidence` | Evidence for a specific graph node |
 | `GET /api/runs/{id}/enrichment` | Persisted CodeWords ontology/migration enrichment |
+| `GET /api/runs/{id}/migration-blueprint` | Execution-ready migration blueprint |
 | `POST /api/copilot/query` | AI copilot with cited answers |
 | `GET /api/integrations/dust/status` | Dust configuration status |
 | `GET /api/integrations/mcp/status` | MCP server discovery |
+| `GET /api/integrations/readiness` | Integration configured/reachable readiness |
 | `POST /api/integrations/codewords/trigger` | Trigger CodeWords workflow |
 | `GET /api/integrations/codewords/result/{id}` | Poll CodeWords result |
 | `GET /health` | Service health check |
@@ -137,8 +139,10 @@ make web-install && make web-run    # Terminal 2
 - `POST /api/repos/{repo_id}/scan` queues a run and returns immediately.
 - Frontend polls `GET /api/repos/{repo_id}/runs/{run_id}` for `status`, `current_step`, and `progress_pct`.
 - Artifacts persist in SQLite at `data/legacy_atlas.db`.
-- `run.summary` includes additive `ontology`, `migration`, `codewords_runtime`, and required analysis counters for downstream UI/agents.
+- `run.summary` includes additive `ontology`, `migration`, `codewords_runtime`, required analysis counters, and `ingestion_branch` telemetry for downstream UI/agents.
 - `GET /api/runs/{run_id}/enrichment` exposes normalized CodeWords enrichment (`ontology_enrichment`, `migration_hints`, `quality_checks`).
+- `GET /api/runs/{run_id}/migration-blueprint` exposes phased migration guidance from run artifacts.
+- `GET /api/integrations/readiness` exposes `configured/reachable/latency` health for Dust, CodeWords, and MCP.
 
 ## Environment Variables
 
@@ -175,7 +179,7 @@ pip install -e .[dev]
 pytest
 ```
 
-6 tests covering: health check, end-to-end scan + graph generation, copilot citations, MCP status, Dust status, and fallback mode.
+10 tests covering health check, end-to-end scan + graph generation, migration blueprint endpoint, manual API flow parity, copilot paths, ingestion branch resolution, MCP/Dust status, integrations readiness, and fallback mode.
 
 ## Repository Structure
 ```

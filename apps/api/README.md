@@ -21,11 +21,13 @@ The API auto-loads variables from `apps/api/.env` at startup (existing shell env
 - `GET /api/runs/{run_id}/risk-summary`
 - `GET /api/runs/{run_id}/node/{node_id}/evidence`
 - `GET /api/runs/{run_id}/enrichment`
+- `GET /api/runs/{run_id}/migration-blueprint`
 - `POST /api/copilot/query`
 - `GET /api/integrations/mcp/status`
 - `POST /api/integrations/codewords/trigger`
 - `GET /api/integrations/codewords/result/{request_id}`
 - `GET /api/integrations/dust/status`
+- `GET /api/integrations/readiness`
 
 ## Real AST mode
 
@@ -44,6 +46,7 @@ If no local path is available, the API returns fallback synthetic artifacts.
   - `ingestion_branch` (effective branch used after branch auto-resolution)
   - `codewords_runtime` (post-analysis workflow trigger/poll status)
 - `GET /api/runs/{run_id}/enrichment` returns normalized CodeWords ontology/migration enrichment payload persisted as an artifact.
+- `GET /api/runs/{run_id}/migration-blueprint` returns an execution-ready migration plan (phases, boundaries, routing risks, top risks, recommendations).
 
 ## Persistence
 
@@ -66,6 +69,14 @@ If no local path is available, the API returns fallback synthetic artifacts.
 - `DUST_WORKSPACE_ID`: required for Dust semantic copilot mode.
 - `DUST_API_KEY`: required for Dust semantic copilot mode.
 - `DUST_ASSISTANT_CONFIGURATION_ID`: required Dust assistant id for mentions.
+
+## Integration readiness
+
+`GET /api/integrations/readiness` returns additive health metadata for Dust, CodeWords, and MCP:
+- `configured`
+- `reachable`
+- `latency_ms`
+- `detail`
 
 ## Real-time logs
 

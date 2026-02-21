@@ -90,6 +90,46 @@ export type EnrichmentPayload = {
   raw: Record<string, unknown>;
 };
 
+export type MigrationBlueprintPhase = {
+  phase_id: string;
+  title: string;
+  objective: string;
+  actions: string[];
+  success_criteria: string[];
+  impacted_modules: string[];
+  risk_watch: string[];
+};
+
+export type MigrationBlueprintPayload = {
+  run_id: string;
+  analysis_mode: string;
+  readiness_score: number;
+  readiness_band: "low" | "medium" | "high";
+  entities: string[];
+  impacted_modules: string[];
+  extraction_boundaries: Array<Record<string, unknown>>;
+  integration_routing: Record<string, unknown>;
+  top_risks: Array<Record<string, unknown>>;
+  recommendations: string[];
+  phased_plan: MigrationBlueprintPhase[];
+  enrichment_status?: string | null;
+  generated_at: string;
+};
+
+export type IntegrationProviderReadiness = {
+  configured: boolean;
+  reachable: boolean;
+  latency_ms?: number | null;
+  detail?: string | null;
+};
+
+export type IntegrationsReadinessResponse = {
+  checked_at: string;
+  codewords: IntegrationProviderReadiness;
+  dust: IntegrationProviderReadiness;
+  mcp: IntegrationProviderReadiness;
+};
+
 const API_BASE = "http://localhost:8000";
 
 export async function registerRepository(
@@ -144,6 +184,10 @@ export async function fetchRunEnrichment(runId: string): Promise<EnrichmentPaylo
   return fetchJson<EnrichmentPayload>(`${API_BASE}/api/runs/${runId}/enrichment`);
 }
 
+export async function fetchMigrationBlueprint(runId: string): Promise<MigrationBlueprintPayload> {
+  return fetchJson<MigrationBlueprintPayload>(`${API_BASE}/api/runs/${runId}/migration-blueprint`);
+}
+
 export async function askCopilot(runId: string, question: string): Promise<CopilotResponse> {
   const response = await fetch(`${API_BASE}/api/copilot/query`, {
     method: "POST",
@@ -162,6 +206,10 @@ export async function fetchDustStatus(): Promise<{ configured: boolean }> {
 
 export async function fetchMcpStatus(): Promise<{ servers: Record<string, unknown> }> {
   return fetchJson<{ servers: Record<string, unknown> }>(`${API_BASE}/api/integrations/mcp/status`);
+}
+
+export async function fetchIntegrationsReadiness(): Promise<IntegrationsReadinessResponse> {
+  return fetchJson<IntegrationsReadinessResponse>(`${API_BASE}/api/integrations/readiness`);
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
