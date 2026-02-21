@@ -10,11 +10,13 @@ import {
   fetchMcpStatus,
   fetchNodeEvidence,
   fetchRiskSummary,
+  fetchRunEnrichment,
   fetchRunStatus,
   fetchWorkflowGraph,
   registerRepository,
   startScan,
   type CopilotResponse,
+  type EnrichmentPayload,
   type EvidencePayload,
   type GraphPayload,
   type RepoResponse,
@@ -30,6 +32,7 @@ type AppState = {
   workflowEvidence: EvidencePayload | null;
   lineageEvidence: EvidencePayload | null;
   riskSummary: RiskSummary | null;
+  enrichment: EnrichmentPayload | null;
   copilot: CopilotResponse | null;
 };
 
@@ -41,6 +44,7 @@ const initialState: AppState = {
   workflowEvidence: null,
   lineageEvidence: null,
   riskSummary: null,
+  enrichment: null,
   copilot: null
 };
 
@@ -52,6 +56,10 @@ export function App(): JSX.Element {
   const [lineageEvidenceLoading, setLineageEvidenceLoading] = useState(false);
   const [dustConfigured, setDustConfigured] = useState(false);
   const [codewordsConfigured, setCodewordsConfigured] = useState(false);
+  const [activeTab, setActiveTab] = useState<"scan" | "process" | "data" | "risk" | "copilot">("scan");
+  const [symbolNodeMap, setSymbolNodeMap] = useState<Map<string, string>>(new Map());
+  const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
+  const [showDashboard, setShowDashboard] = useState(false);
 
   useEffect(() => {
     fetchDustStatus()
@@ -61,6 +69,16 @@ export function App(): JSX.Element {
       .then((res) => setCodewordsConfigured("CodeWords" in (res.servers || {})))
       .catch(() => setCodewordsConfigured(false));
   }, []);
+
+  const hasCompletedRun = state.run?.status === "completed";
+
+  // Trigger light→dark transition after run completes
+  useEffect(() => {
+    if (hasCompletedRun && !showDashboard) {
+      const timer = setTimeout(() => setShowDashboard(true), 80);
+      return () => clearTimeout(timer);
+    }
+  }, [hasCompletedRun, showDashboard]);
 
   async function handleStart(repoUrl: string, commitSha: string, localPath: string): Promise<{ repo: RepoResponse; run: RunResponse }> {
     setBusy(true);
@@ -73,10 +91,11 @@ export function App(): JSX.Element {
         setState((current) => ({ ...current, run }));
       });
 
-      const [workflowGraph, lineageGraph, riskSummary] = await Promise.all([
+      const [workflowGraph, lineageGraph, riskSummary, enrichment] = await Promise.all([
         fetchWorkflowGraph(completedRun.id),
         fetchLineageGraph(completedRun.id),
-        fetchRiskSummary(completedRun.id)
+        fetchRiskSummary(completedRun.id),
+        fetchRunEnrichment(completedRun.id).catch(() => null)
       ]);
 
       setState((current) => ({
@@ -88,8 +107,11 @@ export function App(): JSX.Element {
         workflowEvidence: null,
         lineageEvidence: null,
         riskSummary,
+        enrichment,
         copilot: null
       }));
+
+      setActiveTab("process");
 
       return { repo, run: completedRun };
     } finally {
@@ -133,6 +155,37 @@ export function App(): JSX.Element {
     [state.run]
   );
 
+  // Build symbol → nodeId map from workflow graph evidence
+  useEffect(() => {
+    if (!state.workflowGraph || state.workflowGraph.nodes.length === 0) {
+      setSymbolNodeMap(new Map());
+      return;
+    }
+    const runId = state.workflowGraph.run_id;
+    const map = new Map<string, string>();
+    Promise.all(
+      state.workflowGraph.nodes.map(async (node) => {
+        try {
+          const ev = await fetchNodeEvidence(runId, node.id);
+          for (const sym of ev.symbols) {
+            map.set(sym, node.id);
+          }
+        } catch {
+          // skip
+        }
+      })
+    ).then(() => setSymbolNodeMap(new Map(map)));
+  }, [state.workflowGraph]);
+
+  const handleFocusNode = useCallback(
+    (nodeId: string) => {
+      setActiveTab("process");
+      setFocusedNodeId(nodeId);
+      handleSelectWorkflowNode(nodeId);
+    },
+    [handleSelectWorkflowNode]
+  );
+
   async function handleAsk(question: string): Promise<void> {
     if (!state.run) {
       return;
@@ -156,15 +209,9 @@ export function App(): JSX.Element {
     return `${state.repo.owner}/${state.repo.name} | ${state.run.commit_sha} | ${state.run.status} | ${state.run.current_step} | ${progress} | ${mode}`;
   }, [state.repo, state.run]);
 
-  return (
-    <div className="app-shell">
-      <header>
-        <h1>Legacy Atlas</h1>
-        <p>AI-powered legacy comprehension with process maps, lineage tracing, and risk intelligence.</p>
-        <div className={`run-pill ${state.run ? `run-pill-${state.run.status}` : ""}`}>{runSummary}</div>
-      </header>
-
-      <main>
+  if (!showDashboard) {
+    return (
+      <div className="app-shell app-shell-light">
         <RepoIntakePanel
           isBusy={busy}
           run={state.run}
@@ -172,28 +219,105 @@ export function App(): JSX.Element {
           codewordsConfigured={codewordsConfigured}
           onStart={handleStart}
         />
+      </div>
+    );
+  }
 
-        <section className="grid two-col">
+  return (
+    <div className="app-shell app-shell-enter">
+      <header className="header-compact">
+        <h1>Legacy Atlas</h1>
+        <div className={`run-pill run-pill-${state.run!.status}`}>{runSummary}</div>
+        <button className="new-analysis-btn" onClick={() => { setState(initialState); setShowDashboard(false); setActiveTab("scan"); }}>
+          New Analysis &rarr;
+        </button>
+      </header>
+
+      <div className="kpi-bar">
+        <div className="kpi-item">
+          <span className="kpi-label">Files Analyzed</span>
+          <span className="kpi-value">{String(state.run!.summary?.files_scanned ?? 0)}</span>
+        </div>
+        <div className="kpi-divider" />
+        <div className="kpi-item">
+          <span className="kpi-label">Workflow Nodes</span>
+          <span className="kpi-value">{state.workflowGraph?.nodes.length ?? 0}</span>
+        </div>
+        <div className="kpi-divider" />
+        <div className="kpi-item">
+          <span className="kpi-label">Data Entities</span>
+          <span className="kpi-value">{state.lineageGraph?.nodes.length ?? 0}</span>
+        </div>
+        <div className="kpi-divider" />
+        <div className="kpi-item">
+          <span className="kpi-label">Risk Findings</span>
+          <span className="kpi-value">{state.riskSummary?.findings.length ?? 0}</span>
+        </div>
+        <div className="kpi-divider" />
+        <div className="kpi-item">
+          <span className="kpi-label">Analysis Mode</span>
+          <span className="kpi-value kpi-mode">{String(state.run!.summary?.analysis_mode ?? "N/A")}</span>
+        </div>
+      </div>
+
+      <nav className="tab-bar">
+        <button className={`tab-btn ${activeTab === "process" ? "active" : ""}`} onClick={() => setActiveTab("process")}>Process Explorer</button>
+        <button className={`tab-btn ${activeTab === "data" ? "active" : ""}`} onClick={() => setActiveTab("data")}>Data Lineage</button>
+        <button className={`tab-btn ${activeTab === "risk" ? "active" : ""}`} onClick={() => setActiveTab("risk")}>Risk Analysis</button>
+        <button className={`tab-btn ${activeTab === "copilot" ? "active" : ""}`} onClick={() => setActiveTab("copilot")}>Copilot</button>
+      </nav>
+      <p className="tab-description">
+        {activeTab === "process" && "How your codebase\u2019s business workflows connect and flow"}
+        {activeTab === "data" && "How data entities move across modules in your system"}
+        {activeTab === "risk" && "Where complexity and technical debt create migration risk"}
+        {activeTab === "copilot" && "Ask questions about the codebase and get cited answers"}
+      </p>
+
+      <main>
+        {activeTab === "process" && (
           <GraphPanel
             title="Process Atlas"
             graph={state.workflowGraph}
             evidence={state.workflowEvidence}
             evidenceLoading={workflowEvidenceLoading}
             onSelectNode={handleSelectWorkflowNode}
+            focusedNodeId={focusedNodeId}
+            riskSummary={state.riskSummary}
+            enrichment={state.enrichment}
           />
+        )}
+
+        {activeTab === "data" && (
           <GraphPanel
             title="Data Lineage Navigator"
             graph={state.lineageGraph}
             evidence={state.lineageEvidence}
             evidenceLoading={lineageEvidenceLoading}
             onSelectNode={handleSelectLineageNode}
+            showEdgeLabels
+            riskSummary={state.riskSummary}
           />
-        </section>
+        )}
 
-        <section className="grid two-col">
-          <RiskPanel summary={state.riskSummary} />
-          <CopilotPanel runId={state.run?.id ?? null} response={state.copilot} isBusy={copilotBusy} onAsk={handleAsk} />
-        </section>
+        {activeTab === "risk" && (
+          <>
+            <GraphPanel
+              title="Risk Atlas"
+              graph={state.workflowGraph}
+              evidence={state.workflowEvidence}
+              evidenceLoading={workflowEvidenceLoading}
+              onSelectNode={handleSelectWorkflowNode}
+              riskOverlay
+              focusedNodeId={focusedNodeId}
+              riskSummary={state.riskSummary}
+            />
+            <RiskPanel summary={state.riskSummary} enrichment={state.enrichment} />
+          </>
+        )}
+
+        {activeTab === "copilot" && (
+          <CopilotPanel runId={state.run?.id ?? null} response={state.copilot} isBusy={copilotBusy} onAsk={handleAsk} onFocusNode={handleFocusNode} symbolNodeMap={symbolNodeMap} />
+        )}
       </main>
     </div>
   );

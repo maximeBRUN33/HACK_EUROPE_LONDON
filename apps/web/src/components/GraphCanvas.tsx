@@ -1,34 +1,156 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { GraphPayload, GraphNode } from "../lib/api";
 
 type GraphCanvasProps = {
   graph: GraphPayload;
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string) => void;
+  nodeSubtitles?: Map<string, string>;
+  riskOverlay?: boolean;
+  showEdgeLabels?: boolean;
 };
 
 type Point = { x: number; y: number };
 
-const MIN_WIDTH = 960;
-const HEIGHT = 420;
-const LAYER_GAP = 170;
-const PADDING_X = 90;
+const NODE_WIDTH = 260;
+const NODE_HEIGHT = 52;
+const LAYER_GAP_Y = 110;
+const NODE_GAP_X = 40;
+const PADDING = 80;
 
-export function GraphCanvas({ graph, selectedNodeId, onSelectNode }: GraphCanvasProps): JSX.Element {
-  const { positions, viewWidth } = useMemo(() => buildLayout(graph), [graph]);
+export function GraphCanvas({ graph, selectedNodeId, onSelectNode, nodeSubtitles, riskOverlay, showEdgeLabels }: GraphCanvasProps): JSX.Element {
+  const { positions, viewWidth, viewHeight } = useMemo(() => buildLayout(graph), [graph]);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const dragRef = useRef<{ startX: number; startY: number; startPanX: number; startPanY: number } | null>(null);
+  const [viewState, setViewState] = useState({ zoom: 1, panX: 0, panY: 0 });
+
+  // Reset zoom/pan when graph data changes
+  useEffect(() => {
+    setViewState({ zoom: 1, panX: 0, panY: 0 });
+  }, [graph]);
+
+  // Non-passive wheel listener for zoom-toward-cursor
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    function onWheel(e: WheelEvent) {
+      e.preventDefault();
+      const factor = e.deltaY > 0 ? 0.9 : 1.1;
+      setViewState((prev) => {
+        const newZoom = Math.max(0.3, Math.min(5, prev.zoom * factor));
+        const rect = svg!.getBoundingClientRect();
+        const cx = (e.clientX - rect.left) / rect.width;
+        const cy = (e.clientY - rect.top) / rect.height;
+        const oldW = viewWidth / prev.zoom;
+        const oldH = viewHeight / prev.zoom;
+        const newW = viewWidth / newZoom;
+        const newH = viewHeight / newZoom;
+        return {
+          zoom: newZoom,
+          panX: prev.panX + cx * (oldW - newW),
+          panY: prev.panY + cy * (oldH - newH),
+        };
+      });
+    }
+
+    svg.addEventListener("wheel", onWheel, { passive: false });
+    return () => svg.removeEventListener("wheel", onWheel);
+  }, [viewWidth, viewHeight]);
+
+  function handleMouseDown(e: React.MouseEvent<SVGSVGElement>) {
+    if (e.button !== 0) return;
+    if ((e.target as Element).closest(".graph-node")) return;
+    e.preventDefault();
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startPanX: viewState.panX,
+      startPanY: viewState.panY,
+    };
+  }
+
+  function handleMouseMove(e: React.MouseEvent<SVGSVGElement>) {
+    if (!dragRef.current) return;
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    setViewState((prev) => {
+      const scaleX = (viewWidth / prev.zoom) / rect.width;
+      const scaleY = (viewHeight / prev.zoom) / rect.height;
+      return {
+        ...prev,
+        panX: dragRef.current!.startPanX - (e.clientX - dragRef.current!.startX) * scaleX,
+        panY: dragRef.current!.startPanY - (e.clientY - dragRef.current!.startY) * scaleY,
+      };
+    });
+  }
+
+  function handleMouseUp() {
+    dragRef.current = null;
+  }
+
+  function handleZoomIn() {
+    setViewState((prev) => {
+      const newZoom = Math.min(5, prev.zoom * 1.3);
+      const oldW = viewWidth / prev.zoom;
+      const oldH = viewHeight / prev.zoom;
+      const newW = viewWidth / newZoom;
+      const newH = viewHeight / newZoom;
+      return { zoom: newZoom, panX: prev.panX + (oldW - newW) / 2, panY: prev.panY + (oldH - newH) / 2 };
+    });
+  }
+
+  function handleZoomOut() {
+    setViewState((prev) => {
+      const newZoom = Math.max(0.3, prev.zoom / 1.3);
+      const oldW = viewWidth / prev.zoom;
+      const oldH = viewHeight / prev.zoom;
+      const newW = viewWidth / newZoom;
+      const newH = viewHeight / newZoom;
+      return { zoom: newZoom, panX: prev.panX + (oldW - newW) / 2, panY: prev.panY + (oldH - newH) / 2 };
+    });
+  }
+
+  function handleResetView() {
+    setViewState({ zoom: 1, panX: 0, panY: 0 });
+  }
+
+  const vbW = viewWidth / viewState.zoom;
+  const vbH = viewHeight / viewState.zoom;
+  const halfW = NODE_WIDTH / 2;
+  const halfH = NODE_HEIGHT / 2;
 
   return (
     <div className="graph-canvas-wrap">
-      <svg className="graph-canvas" viewBox={`0 0 ${viewWidth} ${HEIGHT}`} role="img" aria-label="Dependency graph canvas">
+      <div className="graph-controls">
+        <button onClick={handleZoomIn} title="Zoom in">+</button>
+        <button onClick={handleZoomOut} title="Zoom out">&minus;</button>
+        <button onClick={handleResetView} title="Reset view">&#x21BA;</button>
+      </div>
+      <svg
+        ref={svgRef}
+        className="graph-canvas"
+        viewBox={`${viewState.panX} ${viewState.panY} ${vbW} ${vbH}`}
+        role="img"
+        aria-label="Dependency graph canvas"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
         <defs>
           <marker id="arrow-control" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#5ec9f3" />
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#D1D5DB" />
           </marker>
           <marker id="arrow-data" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#7ce3b6" />
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#D1D5DB" />
+          </marker>
+          <marker id="arrow-data-lg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#D1D5DB" />
           </marker>
           <marker id="arrow-risk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#ff8a6f" />
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#D1D5DB" />
           </marker>
         </defs>
 
@@ -39,8 +161,8 @@ export function GraphCanvas({ graph, selectedNodeId, onSelectNode }: GraphCanvas
             return null;
           }
 
-          const path = curvedPath(source, target);
-          const markerId = edge.edge_type === "data" ? "arrow-data" : edge.edge_type === "risk" ? "arrow-risk" : "arrow-control";
+          const path = verticalCurvedPath(source, target);
+          const markerId = edge.edge_type === "data" ? (showEdgeLabels ? "arrow-data-lg" : "arrow-data") : edge.edge_type === "risk" ? "arrow-risk" : "arrow-control";
 
           return (
             <path
@@ -53,6 +175,19 @@ export function GraphCanvas({ graph, selectedNodeId, onSelectNode }: GraphCanvas
           );
         })}
 
+        {showEdgeLabels && graph.edges.map((edge, index) => {
+          const source = positions.get(edge.source);
+          const target = positions.get(edge.target);
+          if (!source || !target) return null;
+          const midX = (source.x + target.x) / 2;
+          const midY = (source.y + target.y) / 2;
+          return (
+            <text key={`elabel-${index}`} x={midX + 10} y={midY} className="edge-label" textAnchor="start">
+              {edge.edge_type}
+            </text>
+          );
+        })}
+
         {graph.nodes.map((node) => {
           const point = positions.get(node.id);
           if (!point) {
@@ -60,10 +195,12 @@ export function GraphCanvas({ graph, selectedNodeId, onSelectNode }: GraphCanvas
           }
 
           const isSelected = selectedNodeId === node.id;
+          const riskClass = riskOverlay ? riskLevelClass(node.risk_score) : "";
+          const riskColor = riskScoreColor(node.risk_score);
           return (
             <g
               key={node.id}
-              className={`graph-node node-${node.node_type} ${isSelected ? "selected" : ""}`}
+              className={`graph-node node-${node.node_type} ${isSelected ? "selected" : ""} ${riskClass}`}
               transform={`translate(${point.x}, ${point.y})`}
               role="button"
               tabIndex={0}
@@ -75,12 +212,16 @@ export function GraphCanvas({ graph, selectedNodeId, onSelectNode }: GraphCanvas
                 }
               }}
             >
-              <rect x={-72} y={-24} rx={12} ry={12} width={144} height={48} />
-              <text className="node-label" x={0} y={-2} textAnchor="middle">
-                {truncate(node.label, 22)}
+              <rect x={-halfW} y={-halfH} rx={12} ry={12} width={NODE_WIDTH} height={NODE_HEIGHT} />
+              <circle cx={halfW - 18} cy={0} r={7} fill={riskColor} opacity={0.85} />
+              <text className="node-label" x={-halfW + 16} y={-6} textAnchor="start">
+                {truncate(humanizeLabel(node.label), 30)}
               </text>
-              <text className="node-meta" x={0} y={14} textAnchor="middle">
-                {node.node_type} | risk {Math.round(node.risk_score)}
+              <text className="node-subtitle" x={-halfW + 16} y={10} textAnchor="start">
+                {truncate(nodeSubtitles?.get(node.id) ?? inferOperation(node.label) ?? "", 32)}
+              </text>
+              <text className="node-meta" x={halfW - 32} y={-6} textAnchor="end">
+                {Math.round(node.risk_score)}
               </text>
             </g>
           );
@@ -90,6 +231,29 @@ export function GraphCanvas({ graph, selectedNodeId, onSelectNode }: GraphCanvas
   );
 }
 
+function humanizeLabel(label: string): string {
+  const words = label
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .split(/\s+/);
+  const strip = ["View", "Model", "Serializer", "Controller", "Handler", "Manager", "Mixin"];
+  if (words.length > 1 && strip.includes(words[words.length - 1])) {
+    words.pop();
+  }
+  return words.join(" ");
+}
+
+function inferOperation(label: string): string | null {
+  const l = label.toLowerCase();
+  if (l.includes("create")) return "POST";
+  if (l.includes("delete") || l.includes("destroy")) return "DELETE";
+  if (l.includes("update") || l.includes("edit")) return "PUT";
+  if (l.includes("list") || l.includes("index")) return "GET";
+  if (l.includes("detail") || l.includes("retrieve")) return "GET";
+  return null;
+}
+
 function truncate(value: string, max: number): string {
   if (value.length <= max) {
     return value;
@@ -97,19 +261,31 @@ function truncate(value: string, max: number): string {
   return `${value.slice(0, max - 3)}...`;
 }
 
-function curvedPath(source: Point, target: Point): string {
-  const controlOffset = Math.max(40, Math.abs(target.x - source.x) * 0.4);
-  const c1x = source.x + controlOffset;
-  const c2x = target.x - controlOffset;
-  return `M ${source.x} ${source.y} C ${c1x} ${source.y}, ${c2x} ${target.y}, ${target.x} ${target.y}`;
+function riskLevelClass(score: number): string {
+  if (score > 70) return "risk-high";
+  if (score >= 50) return "risk-medium";
+  return "risk-low";
 }
 
-function buildLayout(graph: GraphPayload): { positions: Map<string, Point>; viewWidth: number } {
+function riskScoreColor(score: number): string {
+  if (score > 70) return "#EF4444";
+  if (score >= 50) return "#F59E0B";
+  return "#22C55E";
+}
+
+function verticalCurvedPath(source: Point, target: Point): string {
+  const controlOffset = Math.max(30, Math.abs(target.y - source.y) * 0.35);
+  const c1y = source.y + controlOffset;
+  const c2y = target.y - controlOffset;
+  return `M ${source.x} ${source.y} C ${source.x} ${c1y}, ${target.x} ${c2y}, ${target.x} ${target.y}`;
+}
+
+function buildLayout(graph: GraphPayload): { positions: Map<string, Point>; viewWidth: number; viewHeight: number } {
   const positions = new Map<string, Point>();
   const byId = new Map(graph.nodes.map((node) => [node.id, node]));
 
   if (graph.nodes.length === 0) {
-    return { positions, viewWidth: MIN_WIDTH };
+    return { positions, viewWidth: 960, viewHeight: 420 };
   }
 
   const outgoing = new Map<string, string[]>();
@@ -171,16 +347,19 @@ function buildLayout(graph: GraphPayload): { positions: Map<string, Point>; view
 
   const sortedLayers = [...layers.entries()].sort((a, b) => a[0] - b[0]);
   const layerCount = sortedLayers.length;
-  const viewWidth = Math.max(MIN_WIDTH, PADDING_X * 2 + layerCount * LAYER_GAP);
+  const maxNodesInLayer = Math.max(...sortedLayers.map(([, nodes]) => nodes.length), 1);
+  const viewWidth = Math.max(960, PADDING * 2 + maxNodesInLayer * (NODE_WIDTH + NODE_GAP_X));
+  const viewHeight = Math.max(420, PADDING * 2 + layerCount * LAYER_GAP_Y);
 
   for (const [layer, nodes] of sortedLayers) {
-    const x = layerCount <= 1 ? viewWidth / 2 : PADDING_X + (layer / (layerCount - 1)) * (viewWidth - PADDING_X * 2);
-    const verticalGap = HEIGHT / (nodes.length + 1);
+    const y = PADDING + layer * LAYER_GAP_Y;
+    const totalWidth = nodes.length * NODE_WIDTH + (nodes.length - 1) * NODE_GAP_X;
+    const startX = (viewWidth - totalWidth) / 2 + NODE_WIDTH / 2;
     nodes.forEach((node, index) => {
-      const y = (index + 1) * verticalGap;
+      const x = startX + index * (NODE_WIDTH + NODE_GAP_X);
       positions.set(node.id, { x, y });
     });
   }
 
-  return { positions, viewWidth };
+  return { positions, viewWidth, viewHeight };
 }

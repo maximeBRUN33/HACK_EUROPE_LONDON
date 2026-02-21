@@ -40,10 +40,13 @@ function stepStatus(stepKey: string, currentStep: string, runStatus: string): "p
 }
 
 export function RepoIntakePanel({ isBusy, run, dustConfigured, codewordsConfigured, onStart }: RepoIntakePanelProps): JSX.Element {
-  const [repoUrl, setRepoUrl] = useState("https://github.com/frappe/erpnext");
-  const [commitSha, setCommitSha] = useState("hackathon-seed");
-  const [localPath, setLocalPath] = useState("");
+  const [repoUrl, setRepoUrl] = useState("https://github.com/akashroshan135/inventory-management.git");
+  const [commitSha, setCommitSha] = useState("main");
+  const [localPath, setLocalPath] = useState("/Users/alessandrocondorelli/inventory-management");
   const [error, setError] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const isAnalyzing = isBusy || (run !== null && run.status !== "completed" && run.status !== "failed");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -55,62 +58,113 @@ export function RepoIntakePanel({ isBusy, run, dustConfigured, codewordsConfigur
     }
   }
 
-  return (
-    <section className="card intake-card">
-      <div className="card-title-row">
-        <h2>Repository Mission Control</h2>
-        <span className="badge">Phase 1</span>
-      </div>
-      <p className="muted">Register a repo and trigger an analysis run to populate workflow, lineage, and risk panels.</p>
-      <form onSubmit={handleSubmit} className="stack">
-        <label>
-          Repository URL
-          <input value={repoUrl} onChange={(event) => setRepoUrl(event.target.value)} placeholder="https://github.com/org/repo" required />
-        </label>
-        <label>
-          Commit SHA (or label)
-          <input value={commitSha} onChange={(event) => setCommitSha(event.target.value)} placeholder="commit-sha" required />
-        </label>
-        <label>
-          Local Repo Path (recommended for real AST)
-          <input
-            value={localPath}
-            onChange={(event) => setLocalPath(event.target.value)}
-            placeholder="/absolute/path/to/local/repo"
-          />
-        </label>
-        <button type="submit" disabled={isBusy}>{isBusy ? "Analyzing..." : "Start Analysis"}</button>
-      </form>
-      {error && <p className="error">{error}</p>}
+  const repoName = repoUrl.replace(/^https?:\/\/github\.com\//, "").replace(/\/$/, "") || "repository";
 
-      {run && run.status !== "queued" && (
-        <div className="pipeline-tracker">
-          <div className="pipeline-steps">
-            {PIPELINE_STEPS.map((step) => {
-              const status = stepStatus(step.key, run.current_step, run.status);
-              return (
-                <div key={step.key} className={`pipeline-step pipeline-step-${status}`}>
-                  <div className="pipeline-step-indicator">
-                    {status === "completed" ? "\u2713" : status === "active" ? "\u25CF" : "\u25CB"}
+  if (isAnalyzing && run) {
+    return (
+      <div className="landing-light">
+        <div className="ll-loading">
+          <div className="ll-loading-label">Analyzing</div>
+          <div className="ll-loading-repo">{repoName}</div>
+
+          <div className="ll-pipeline">
+            <div className="pipeline-steps ll-steps">
+              {PIPELINE_STEPS.map((step) => {
+                const status = stepStatus(step.key, run.current_step, run.status);
+                return (
+                  <div key={step.key} className={`pipeline-step ll-step ll-step-${status}`}>
+                    <div className="ll-step-dot">
+                      {status === "completed" ? "\u2713" : status === "active" ? "\u25CF" : "\u25CB"}
+                    </div>
+                    <span className="ll-step-label">{step.label}</span>
                   </div>
-                  <span className="pipeline-step-label">{step.label}</span>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+            <div className="ll-progress-track">
+              <div className="ll-progress-fill" style={{ width: `${Math.round(run.progress_pct)}%` }} />
+            </div>
           </div>
-          <div className="pipeline-bar">
-            <div className="pipeline-bar-fill" style={{ width: `${Math.round(run.progress_pct)}%` }} />
-          </div>
-          <div className="integration-badges">
-            <span className={`integration-badge ${dustConfigured ? "configured" : "not-configured"}`}>
+
+          <div className="ll-badges">
+            <span className={`ll-badge ${dustConfigured ? "ll-badge-ok" : ""}`}>
               Dust {dustConfigured ? "\u2713" : "\u2717"}
             </span>
-            <span className={`integration-badge ${codewordsConfigured ? "configured" : "not-configured"}`}>
+            <span className={`ll-badge ${codewordsConfigured ? "ll-badge-ok" : ""}`}>
               CodeWords {codewordsConfigured ? "\u2713" : "\u2717"}
             </span>
           </div>
         </div>
-      )}
-    </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className="landing-light">
+      <div className="ll-hero">
+        <h1 className="ll-headline">
+          Meet <strong>Legacy Atlas</strong>
+        </h1>
+        <p className="ll-subtitle">AI-powered legacy code comprehension.</p>
+      </div>
+
+      <div className="ll-input-card">
+        <form onSubmit={handleSubmit}>
+          <input
+            className="ll-input"
+            value={repoUrl}
+            onChange={(event) => setRepoUrl(event.target.value)}
+            placeholder="Paste a GitHub repository URL..."
+            required
+          />
+
+          <button
+            type="button"
+            className="ll-advanced-toggle"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+          >
+            {showAdvanced ? "Hide options" : "Advanced options"}
+          </button>
+
+          {showAdvanced && (
+            <div className="ll-advanced">
+              <label className="ll-adv-label">
+                Commit SHA
+                <input
+                  className="ll-adv-input"
+                  value={commitSha}
+                  onChange={(event) => setCommitSha(event.target.value)}
+                  placeholder="main"
+                />
+              </label>
+              <label className="ll-adv-label">
+                Local Repo Path
+                <input
+                  className="ll-adv-input"
+                  value={localPath}
+                  onChange={(event) => setLocalPath(event.target.value)}
+                  placeholder="/absolute/path/to/local/repo"
+                />
+              </label>
+            </div>
+          )}
+
+          <button type="submit" className="ll-cta" disabled={isBusy}>
+            {isBusy ? "Analyzing..." : "Analyze Repository \u2192"}
+          </button>
+        </form>
+        {error && <p className="ll-error">{error}</p>}
+      </div>
+
+      <div className="ll-social">
+        <p className="ll-social-label">Built for companies managing legacy codebases</p>
+        <p className="ll-social-logos">SAP &bull; Oracle &bull; ERPNext &bull; Odoo &bull; Django &bull; Python</p>
+      </div>
+
+      <footer className="ll-footer">
+        <p>{"{Tech: Europe}"} London Hackathon &mdash; Conduct Track</p>
+        <p>Powered by Gemini &bull; Dust &bull; CodeWords</p>
+      </footer>
+    </div>
   );
 }
