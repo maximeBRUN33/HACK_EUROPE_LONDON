@@ -11,6 +11,7 @@ os.environ["LEGACY_ATLAS_CODEWORDS_RUNTIME_HOOK"] = "0"
 
 from app.main import app
 from app.services.dust_client import DustSemanticResponse
+from app.services.gemini_client import GeminiWebCompareResult, GeminiWebItem
 from app.store import store
 
 
@@ -421,6 +422,148 @@ def test_copilot_prefers_dust_when_configured(monkeypatch, tmp_path: Path) -> No
     assert payload["answer"] == "Dust grounded answer"
     assert payload["citations"][0]["file_path"] == "services/workflow.py"
     assert calls["semantic"] == 1
+
+
+def test_copilot_web_compare_success(monkeypatch, tmp_path: Path) -> None:
+    _build_sample_python_repo(tmp_path)
+    repo = client.post(
+        "/api/repos/register",
+        json={
+            "repo_url": "https://github.com/odoo/odoo",
+            "default_branch": "master",
+            "local_path": str(tmp_path),
+        },
+    ).json()
+    run = client.post(
+        f"/api/repos/{repo['id']}/scan",
+        json={"commit_sha": "seed-gemini-001"},
+    ).json()
+
+    class FakeGemini:
+        model = "gemini-2.0-flash"
+
+        def is_configured(self) -> bool:
+            return True
+
+        def web_compare(self, *, question: str, answer: str, max_results: int, platforms: list[str]) -> GeminiWebCompareResult:
+            assert "sales" in question.lower()
+            assert answer
+            assert max_results == 4
+            assert platforms == ["reddit", "x"]
+            return GeminiWebCompareResult(
+                model=self.model,
+                status="completed",
+                summary="Found matching engineering discussions on Reddit and X.",
+                items=[
+                    GeminiWebItem(
+                        platform="reddit",
+                        title="How to refactor monolith workflows safely",
+                        url="https://www.reddit.com/r/softwarearchitecture/comments/example",
+                        snippet="Thread discusses bounded context extraction strategies.",
+                        why_relevant="Matches copilot recommendation on staged migration.",
+                    ),
+                    GeminiWebItem(
+                        platform="x",
+                        title="Migration sequencing and risk cutover tips",
+                        url="https://x.com/example/status/123",
+                        snippet="Post outlines phased cutover and rollback guardrails.",
+                        why_relevant="Aligned with risk-first rollout guidance.",
+                    ),
+                ],
+                raw={"ok": True},
+            )
+
+    monkeypatch.setattr("app.routers.copilot.GeminiClient", FakeGemini)
+
+    response = client.post(
+        "/api/copilot/web-compare",
+        json={
+            "run_id": run["id"],
+            "question": "Where is sales confirmation logic and what can break?",
+            "answer": "Primary impact area is workflow confirmation with coupling risk.",
+            "max_results": 4,
+            "platforms": ["reddit", "x"],
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["provider"] == "gemini"
+    assert payload["model"] == "gemini-2.0-flash"
+    assert payload["status"] == "completed"
+    assert "reddit" in [item["platform"] for item in payload["items"]]
+    assert "x" in [item["platform"] for item in payload["items"]]
+    assert len(payload["items"]) == 2
+
+
+def test_copilot_web_compare_unconfigured(monkeypatch, tmp_path: Path) -> None:
+    _build_sample_python_repo(tmp_path)
+    repo = client.post(
+        "/api/repos/register",
+        json={
+            "repo_url": "https://github.com/odoo/odoo",
+            "default_branch": "master",
+            "local_path": str(tmp_path),
+        },
+    ).json()
+    run = client.post(
+        f"/api/repos/{repo['id']}/scan",
+        json={"commit_sha": "seed-gemini-002"},
+    ).json()
+
+    class FakeGemini:
+        def is_configured(self) -> bool:
+            return False
+
+    monkeypatch.setattr("app.routers.copilot.GeminiClient", FakeGemini)
+
+    response = client.post(
+        "/api/copilot/web-compare",
+        json={
+            "run_id": run["id"],
+            "question": "What breaks if I change lead assignment?",
+            "answer": "Lead assignment impacts coupling and downstream workflows.",
+        },
+    )
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["detail"]["detail_code"] == "GEMINI_NOT_CONFIGURED"
+
+
+def test_copilot_web_compare_upstream_error(monkeypatch, tmp_path: Path) -> None:
+    _build_sample_python_repo(tmp_path)
+    repo = client.post(
+        "/api/repos/register",
+        json={
+            "repo_url": "https://github.com/odoo/odoo",
+            "default_branch": "master",
+            "local_path": str(tmp_path),
+        },
+    ).json()
+    run = client.post(
+        f"/api/repos/{repo['id']}/scan",
+        json={"commit_sha": "seed-gemini-003"},
+    ).json()
+
+    class FakeGemini:
+        def is_configured(self) -> bool:
+            return True
+
+        def web_compare(self, *, question: str, answer: str, max_results: int, platforms: list[str]) -> GeminiWebCompareResult:
+            raise RuntimeError("Gemini HTTP error 429: rate limit")
+
+    monkeypatch.setattr("app.routers.copilot.GeminiClient", FakeGemini)
+
+    response = client.post(
+        "/api/copilot/web-compare",
+        json={
+            "run_id": run["id"],
+            "question": "Where is invoice generation and migration risk?",
+            "answer": "Invoice flow has complexity hotspots in posting logic.",
+        },
+    )
+    assert response.status_code == 502
+    payload = response.json()
+    assert payload["detail"]["detail_code"] == "GEMINI_WEB_COMPARISON_FAILED"
 
 
 def test_mcp_status_endpoint_exposes_server_names_without_secrets() -> None:

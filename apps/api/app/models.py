@@ -119,6 +119,31 @@ class CopilotResponse(BaseModel):
     related_nodes: list[str]
 
 
+class CopilotWebCompareRequest(BaseModel):
+    run_id: UUID
+    question: str
+    answer: str
+    max_results: int = Field(default=6, ge=1, le=12)
+    platforms: list[str] = Field(default_factory=lambda: ["reddit", "x"])
+
+
+class WebReferenceItem(BaseModel):
+    platform: str
+    title: str
+    url: HttpUrl
+    snippet: str
+    why_relevant: str = ""
+
+
+class CopilotWebCompareResponse(BaseModel):
+    provider: str = "gemini"
+    model: str
+    status: str
+    summary: str
+    items: list[WebReferenceItem] = Field(default_factory=list)
+    raw: dict = Field(default_factory=dict)
+
+
 class CodeWordsTriggerRequest(BaseModel):
     service_id: str
     inputs: dict = Field(default_factory=dict)

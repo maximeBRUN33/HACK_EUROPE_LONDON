@@ -3,8 +3,9 @@ import logging
 from fastapi import APIRouter
 
 from app.errors import api_error
-from app.models import CopilotCitation, CopilotRequest, CopilotResponse
+from app.models import CopilotCitation, CopilotRequest, CopilotResponse, CopilotWebCompareRequest, CopilotWebCompareResponse, WebReferenceItem
 from app.services.dust_client import DustClient
+from app.services.gemini_client import GeminiClient
 from app.store import store
 
 router = APIRouter(prefix="/api/copilot", tags=["copilot"])
@@ -136,4 +137,57 @@ def query_copilot(payload: CopilotRequest) -> CopilotResponse:
             "Potential regressions where control-flow and data-flow intersect",
         ],
         related_nodes=related,
+    )
+
+
+@router.post("/web-compare", response_model=CopilotWebCompareResponse)
+def compare_copilot_with_web(payload: CopilotWebCompareRequest) -> CopilotWebCompareResponse:
+    logger.info(
+        "Copilot web comparison received run_id=%s platforms=%s",
+        payload.run_id,
+        ",".join(payload.platforms),
+    )
+    run = store.get_run(str(payload.run_id))
+    if run is None:
+        raise api_error(status_code=404, detail_code="RUN_NOT_FOUND", message="Run not found")
+
+    client = GeminiClient()
+    if not client.is_configured():
+        raise api_error(
+            status_code=503,
+            detail_code="GEMINI_NOT_CONFIGURED",
+            message="Gemini integration is not configured",
+        )
+
+    try:
+        result = client.web_compare(
+            question=payload.question,
+            answer=payload.answer,
+            max_results=payload.max_results,
+            platforms=payload.platforms,
+        )
+    except RuntimeError as exc:
+        logger.warning("Gemini web comparison failed run_id=%s error=%s", payload.run_id, exc)
+        raise api_error(
+            status_code=502,
+            detail_code="GEMINI_WEB_COMPARISON_FAILED",
+            message=str(exc),
+            provider="gemini",
+        ) from exc
+
+    return CopilotWebCompareResponse(
+        model=result.model,
+        status=result.status,
+        summary=result.summary,
+        items=[
+            WebReferenceItem(
+                platform=item.platform,
+                title=item.title,
+                url=item.url,
+                snippet=item.snippet,
+                why_relevant=item.why_relevant,
+            )
+            for item in result.items
+        ],
+        raw=result.raw,
     )
