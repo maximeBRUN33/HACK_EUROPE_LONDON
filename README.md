@@ -117,6 +117,7 @@ make web-install && make web-run    # Terminal 2
 | `GET /api/runs/{id}/lineage-graph` | Data lineage graph |
 | `GET /api/runs/{id}/risk-summary` | Risk findings with migration suggestions |
 | `GET /api/runs/{id}/node/{id}/evidence` | Evidence for a specific graph node |
+| `GET /api/runs/{id}/enrichment` | Persisted CodeWords ontology/migration enrichment |
 | `POST /api/copilot/query` | AI copilot with cited answers |
 | `GET /api/integrations/dust/status` | Dust configuration status |
 | `GET /api/integrations/mcp/status` | MCP server discovery |
@@ -133,6 +134,12 @@ make web-install && make web-run    # Terminal 2
 | **RiskPanel** | Risk score dashboard with severity badges and migration suggestions |
 | **CopilotPanel** | AI Q&A with file/symbol/line citations, risk implications, related nodes |
 
+- `POST /api/repos/{repo_id}/scan` queues a run and returns immediately.
+- Frontend polls `GET /api/repos/{repo_id}/runs/{run_id}` for `status`, `current_step`, and `progress_pct`.
+- Artifacts persist in SQLite at `data/legacy_atlas.db`.
+- `run.summary` includes additive `ontology`, `migration`, `codewords_runtime`, and required analysis counters for downstream UI/agents.
+- `GET /api/runs/{run_id}/enrichment` exposes normalized CodeWords enrichment (`ontology_enrichment`, `migration_hints`, `quality_checks`).
+
 ## Environment Variables
 
 | Variable | Purpose |
@@ -140,11 +147,17 @@ make web-install && make web-run    # Terminal 2
 | `DUST_API_KEY` | Dust API key for semantic copilot |
 | `DUST_WORKSPACE_ID` | Dust workspace identifier |
 | `DUST_ASSISTANT_CONFIGURATION_ID` | Dust assistant for copilot responses |
+| `DUST_API_BASE_URL` | Dust API base URL (default `https://dust.tt/api/v1`) |
 | `CODEWORDS_API_KEY` | CodeWords runtime API key |
 | `CODEWORDS_RUNTIME_BASE_URL` | CodeWords runtime base URL |
+| `CODEWORDS_RUNTIME_SERVICE_ID` | CodeWords runtime service id used by post-analysis hook (default: `legacy_atlas_post_analysis_v1_8a477024`; use runtime id, not display title) |
+| `CODEWORDS_POLL_MAX_ATTEMPTS` | Max poll attempts for async CodeWords runtime job |
+| `CODEWORDS_POLL_INTERVAL_SEC` | Poll interval in seconds for CodeWords runtime job |
 | `LEGACY_ATLAS_REPO_CACHE` | Local clone cache directory |
+| `LEGACY_ATLAS_REPO_ROOTS` | Optional local roots for repo discovery fallback |
 | `LEGACY_ATLAS_ENABLE_GIT_INGESTION` | Set to `0` to disable remote clone |
 | `LEGACY_ATLAS_SYNC_JOBS` | Set to `1` for inline analysis (tests) |
+| `LEGACY_ATLAS_CODEWORDS_RUNTIME_HOOK` | Set to `0` to disable post-analysis CodeWords trigger/poll |
 | `LEGACY_ATLAS_LOG_LEVEL` | Runtime logging level (`DEBUG`, `INFO`, `WARNING`, ...) |
 | `LEGACY_ATLAS_AST_PROGRESS_EVERY` | Log AST scan progress every N Python files |
 

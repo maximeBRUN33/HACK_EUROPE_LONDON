@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from app.models import EvidencePayload, GraphPayload, RiskSummaryPayload
+from app.models import EnrichmentPayload, EvidencePayload, GraphPayload, RiskSummaryPayload
 from app.store import store
 
 router = APIRouter(prefix="/api/runs", tags=["graphs"])
@@ -39,4 +39,16 @@ def get_node_evidence(run_id: str, node_id: str) -> EvidencePayload:
     payload = store.get_evidence(run_id, node_id)
     if payload is None:
         raise HTTPException(status_code=404, detail="Evidence not found for node")
+    return payload
+
+
+@router.get("/{run_id}/enrichment", response_model=EnrichmentPayload)
+def get_run_enrichment(run_id: str) -> EnrichmentPayload:
+    run = store.get_run(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    payload = store.get_enrichment(run_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail="Enrichment not found")
     return payload

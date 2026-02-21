@@ -138,3 +138,15 @@ class CodeWordsResultResponse(BaseModel):
     request_id: str
     status: str
     raw: dict = Field(default_factory=dict)
+
+
+class EnrichmentPayload(BaseModel):
+    run_id: UUID
+    provider: str = "codewords"
+    service_id: str | None = None
+    request_id: str | None = None
+    status: str
+    ontology_enrichment: dict = Field(default_factory=dict)
+    migration_hints: dict = Field(default_factory=dict)
+    quality_checks: dict = Field(default_factory=dict)
+    raw: dict = Field(default_factory=dict)

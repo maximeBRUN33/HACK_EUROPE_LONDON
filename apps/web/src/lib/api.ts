@@ -78,6 +78,18 @@ export type EvidencePayload = {
   explanation: string;
 };
 
+export type EnrichmentPayload = {
+  run_id: string;
+  provider: string;
+  service_id?: string | null;
+  request_id?: string | null;
+  status: string;
+  ontology_enrichment: Record<string, unknown>;
+  migration_hints: Record<string, unknown>;
+  quality_checks: Record<string, unknown>;
+  raw: Record<string, unknown>;
+};
+
 const API_BASE = "http://localhost:8000";
 
 export async function registerRepository(
@@ -126,6 +138,10 @@ export async function fetchRiskSummary(runId: string): Promise<RiskSummary> {
 
 export async function fetchNodeEvidence(runId: string, nodeId: string): Promise<EvidencePayload> {
   return fetchJson<EvidencePayload>(`${API_BASE}/api/runs/${runId}/node/${nodeId}/evidence`);
+}
+
+export async function fetchRunEnrichment(runId: string): Promise<EnrichmentPayload> {
+  return fetchJson<EnrichmentPayload>(`${API_BASE}/api/runs/${runId}/enrichment`);
 }
 
 export async function askCopilot(runId: string, question: string): Promise<CopilotResponse> {

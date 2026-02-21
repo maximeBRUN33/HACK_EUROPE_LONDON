@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from app.models import AnalysisRun, EvidencePayload, GraphPayload, Repository, RiskSummaryPayload
+from app.models import AnalysisRun, EnrichmentPayload, EvidencePayload, GraphPayload, Repository, RiskSummaryPayload
 
 
 class SQLiteStore:
@@ -123,6 +123,15 @@ class SQLiteStore:
         if raw is None:
             return None
         return EvidencePayload.model_validate_json(raw)
+
+    def save_enrichment(self, run_id: str, payload: EnrichmentPayload) -> None:
+        self._save_artifact(run_id, "enrichment", "", payload.model_dump_json())
+
+    def get_enrichment(self, run_id: str) -> EnrichmentPayload | None:
+        raw = self._get_artifact(run_id, "enrichment", "")
+        if raw is None:
+            return None
+        return EnrichmentPayload.model_validate_json(raw)
 
     def _save_artifact(self, run_id: str, kind: str, node_id: str, payload: str) -> None:
         with self._connect() as connection:

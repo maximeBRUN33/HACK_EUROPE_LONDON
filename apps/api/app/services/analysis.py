@@ -41,6 +41,16 @@ MIGRATION_SUGGESTIONS: dict[str, list[str]] = {
     ],
 }
 
+CAPABILITY_DOMAIN_HINTS: dict[str, tuple[str, ...]] = {
+    "CRM": ("crm", "lead", "opportunity", "customer", "contact", "prospect"),
+    "Billing": ("invoice", "payment", "billing", "account", "ledger", "tax"),
+    "Inventory": ("stock", "inventory", "warehouse", "shipment", "procure", "purchase"),
+    "Reporting": ("report", "dashboard", "analytics", "kpi", "insight", "metric"),
+}
+
+INBOUND_INTEGRATION_HINTS = ("webhook", "listener", "consumer", "ingest", "receive", "callback", "route", "endpoint")
+OUTBOUND_INTEGRATION_HINTS = ("publish", "emit", "send", "push", "sync", "export", "request", "post", "stripe", "paypal", "queue")
+
 
 def _entity_from_repo_name(name: str) -> str:
     normalized = name.lower()
@@ -421,6 +431,122 @@ def _build_fallback_risk(run: AnalysisRun, repo: Repository) -> RiskSummaryPaylo
     return RiskSummaryPayload(run_id=run.id, overall_score=findings[0].score, findings=findings)
 
 
+def _build_capability_clusters(parsed: ParsedRepository) -> list[dict]:
+    counter: Counter[str] = Counter()
+    for function in parsed.functions:
+        surface = f"{function.file_path} {function.qname} {function.short_name}".lower()
+        for domain, hints in CAPABILITY_DOMAIN_HINTS.items():
+            if any(token in surface for token in hints):
+                counter[domain] += 1
+
+    if not counter:
+        return [{"name": "Core", "signal_count": len(parsed.functions)}]
+    return [{"name": name, "signal_count": count} for name, count in counter.most_common(4)]
+
+
+def _count_integration_exposure(parsed: ParsedRepository) -> tuple[int, int]:
+    inbound = 0
+    outbound = 0
+    for function in parsed.functions:
+        call_surface = " ".join(function.calls[:8])
+        surface = f"{function.file_path} {function.qname} {function.short_name} {call_surface}".lower()
+        if any(token in surface for token in INBOUND_INTEGRATION_HINTS):
+            inbound += 1
+        if any(token in surface for token in OUTBOUND_INTEGRATION_HINTS):
+            outbound += 1
+    return inbound, outbound
+
+
+def _build_ontology_summary_from_ast(parsed: ParsedRepository) -> dict:
+    entity_counts = count_entities(parsed.functions)
+    top_entities = [entity for entity, _count in entity_counts.most_common(6)]
+    inbound_count, outbound_count = _count_integration_exposure(parsed)
+    return {
+        "entities_count": len(entity_counts),
+        "top_entities": top_entities,
+        "capability_clusters": _build_capability_clusters(parsed),
+        "integration_inbound_count": inbound_count,
+        "integration_outbound_count": outbound_count,
+    }
+
+
+def _build_migration_summary_from_ast(parsed: ParsedRepository, risk_summary: RiskSummaryPayload, ontology_summary: dict) -> dict:
+    function_lookup = {function.qname: function for function in parsed.functions}
+    top_findings = sorted(risk_summary.findings, key=lambda item: item.score, reverse=True)[:3]
+
+    extraction_boundaries: list[dict] = []
+    for index, finding in enumerate(top_findings, start=1):
+        function = function_lookup.get(finding.symbol)
+        extraction_boundaries.append(
+            {
+                "name": f"boundary-{index}",
+                "anchor_symbol": finding.symbol,
+                "reason": finding.rationale,
+                "required_entities": sorted(function.entities)[:4] if function else [],
+            }
+        )
+
+    impacted_modules = sorted(
+        {
+            finding.symbol.rsplit(".", 1)[0] if "." in finding.symbol else finding.symbol
+            for finding in top_findings
+        }
+    )
+
+    inbound_count = int(ontology_summary.get("integration_inbound_count", 0))
+    outbound_count = int(ontology_summary.get("integration_outbound_count", 0))
+    integration_penalty = min(25.0, (inbound_count + outbound_count) * 2.5)
+    readiness_score = round(max(5.0, min(95.0, 100.0 - risk_summary.overall_score - integration_penalty)), 2)
+
+    rerouting_risks: list[str] = []
+    if inbound_count > 0:
+        rerouting_risks.append(f"Inbound touchpoints detected in {inbound_count} symbols; preserve contracts during cutover.")
+    if outbound_count > 0:
+        rerouting_risks.append(f"Outbound dependencies detected in {outbound_count} symbols; staged adapter rollout recommended.")
+    if not rerouting_risks:
+        rerouting_risks.append("No explicit integration touchpoints detected; validate dynamically before migration.")
+
+    return {
+        "readiness_score": readiness_score,
+        "extraction_boundaries": extraction_boundaries,
+        "impacted_modules": impacted_modules,
+        "rerouting_risks": rerouting_risks,
+    }
+
+
+def _build_fallback_ontology_summary(repo: Repository) -> dict:
+    core = _entity_from_repo_name(repo.name)
+    inferred_cluster = "CRM" if "crm" in repo.name.lower() else "ERP"
+    return {
+        "entities_count": 3,
+        "top_entities": ["Customer", core, "Invoice"],
+        "capability_clusters": [
+            {"name": inferred_cluster, "signal_count": 2},
+            {"name": "Core", "signal_count": 1},
+        ],
+        "integration_inbound_count": 0,
+        "integration_outbound_count": 0,
+    }
+
+
+def _build_fallback_migration_summary(repo: Repository, risk_summary: RiskSummaryPayload) -> dict:
+    core = _entity_from_repo_name(repo.name)
+    readiness_score = round(max(10.0, min(90.0, 100.0 - risk_summary.overall_score)), 2)
+    return {
+        "readiness_score": readiness_score,
+        "extraction_boundaries": [
+            {
+                "name": "boundary-1",
+                "anchor_symbol": f"{repo.name}.fallback",
+                "reason": "Fallback analysis mode; boundary is heuristic until AST mode is available.",
+                "required_entities": ["Customer", core, "Invoice"],
+            }
+        ],
+        "impacted_modules": [repo.name],
+        "rerouting_risks": ["Integration topology unavailable in fallback mode; validate inbound/outbound routes manually."],
+    }
+
+
 def run_static_analysis(
     run: AnalysisRun,
     repo: Repository,
@@ -470,6 +596,8 @@ def run_static_analysis(
         workflow_graph, workflow_node_map = _build_workflow_graph_from_ast(run, parsed, call_edges, out_degree)
         lineage_graph, entity_functions = _build_lineage_graph_from_ast(run, parsed)
         risk_summary = _build_risk_summary_from_ast(run, parsed, call_edges)
+        ontology_summary = _build_ontology_summary_from_ast(parsed)
+        migration_summary = _build_migration_summary_from_ast(parsed, risk_summary, ontology_summary)
         logger.info(
             "Graph and risk artifacts built run_id=%s workflow_nodes=%s workflow_edges=%s lineage_nodes=%s lineage_edges=%s risk_findings=%s",
             run.id,
@@ -499,6 +627,8 @@ def run_static_analysis(
             "parse_errors": len(parsed.parse_errors),
             "analysis_mode": mode,
             "repo_root": str(repo_root),
+            "ontology": ontology_summary,
+            "migration": migration_summary,
         }
     else:
         logger.warning("No local repository source resolved run_id=%s repo=%s/%s -> fallback mode", run.id, repo.owner, repo.name)
@@ -508,6 +638,8 @@ def run_static_analysis(
         workflow_graph = _build_fallback_workflow(run, repo)
         lineage_graph = _build_fallback_lineage(run, repo)
         risk_summary = _build_fallback_risk(run, repo)
+        ontology_summary = _build_fallback_ontology_summary(repo)
+        migration_summary = _build_fallback_migration_summary(repo, risk_summary)
 
         evidences: dict[str, EvidencePayload] = {}
         for node in [*workflow_graph.nodes, *lineage_graph.nodes]:
@@ -530,8 +662,13 @@ def run_static_analysis(
             "workflow_nodes": len(workflow_graph.nodes),
             "lineage_edges": len(lineage_graph.edges),
             "risk_findings": len(risk_summary.findings),
+            "files_scanned": 0,
+            "functions_scanned": 0,
+            "parse_errors": 0,
             "analysis_mode": "fallback",
             "note": "No local repository path resolved. Register repository with local_path or set LEGACY_ATLAS_REPO_ROOTS.",
+            "ontology": ontology_summary,
+            "migration": migration_summary,
         }
 
     run.current_step = "persisting-artifacts"
@@ -556,10 +693,19 @@ def run_static_analysis(
     return run
 
 
-def create_placeholder_summary(repo: Repository, commit_sha: str) -> dict[str, str]:
+def create_placeholder_summary(repo: Repository, commit_sha: str) -> dict:
     return {
         "repo": repo.name,
         "commit_sha": commit_sha,
         "status": "queued",
         "note": "Run created. Analyzer will use AST mode when local repository path is available.",
+        "analysis_mode": "queued",
+        "workflow_nodes": 0,
+        "lineage_edges": 0,
+        "risk_findings": 0,
+        "files_scanned": 0,
+        "functions_scanned": 0,
+        "parse_errors": 0,
+        "ontology": {},
+        "migration": {},
     }

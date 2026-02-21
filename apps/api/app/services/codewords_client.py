@@ -3,11 +3,15 @@ from __future__ import annotations
 import json
 import os
 import logging
+import re
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlsplit
 from urllib.request import Request, urlopen
 
 from app.integrations.mcp import load_mcp_config
+
+ENV_TOKEN_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 
 @dataclass
@@ -23,12 +27,18 @@ class CodeWordsClient:
         servers = mcp.get("mcpServers", {})
         cw_server = servers.get("CodeWords", {})
 
-        self.base_url = os.getenv("CODEWORDS_RUNTIME_BASE_URL", cw_server.get("url", "https://runtime.codewords.ai")).rstrip("/")
+        configured_base_url = os.getenv("CODEWORDS_RUNTIME_BASE_URL")
+        mcp_url = cw_server.get("url", "https://runtime.codewords.ai")
+        self.base_url = _normalize_runtime_base_url(configured_base_url or mcp_url)
+
         self.api_key = os.getenv("CODEWORDS_API_KEY")
         if not self.api_key:
             header = cw_server.get("headers", {}).get("Authorization", "")
             if isinstance(header, str) and header.lower().startswith("bearer "):
-                self.api_key = header.split(" ", 1)[1].strip()
+                resolved = _expand_env_tokens(header)
+                self.api_key = resolved.split(" ", 1)[1].strip()
+        if self.api_key and "${" in self.api_key:
+            self.api_key = None
         self.logger = logging.getLogger(__name__)
 
     def is_configured(self) -> bool:
@@ -40,7 +50,8 @@ class CodeWordsClient:
         self.logger.info("CodeWords trigger start service_id=%s async=%s", service_id, async_mode)
 
         route = "run_async" if async_mode else "run"
-        base_url = f"{self.base_url}/{route}/{service_id}"
+        encoded_service_id = quote(service_id, safe="")
+        base_url = f"{self.base_url}/{route}/{encoded_service_id}"
         url = base_url if base_url.endswith("/") else f"{base_url}/"
 
         raw: dict
@@ -129,3 +140,21 @@ def _infer_status(payload: dict) -> str:
     if payload.get("result") is not None:
         return "completed"
     return "running"
+
+
+def _expand_env_tokens(value: str) -> str:
+    return ENV_TOKEN_PATTERN.sub(lambda match: os.getenv(match.group(1), match.group(0)), value)
+
+
+def _normalize_runtime_base_url(url: str) -> str:
+    candidate = (url or "").strip()
+    if not candidate:
+        return "https://runtime.codewords.ai"
+
+    parsed = urlsplit(candidate)
+    if parsed.scheme in {"http", "https"} and parsed.netloc:
+        # MCP endpoint can be configured as /run/devx_mcp/mcp; runtime HTTP APIs are at host root.
+        if parsed.path.endswith("/mcp") or parsed.path.endswith("/mcp/"):
+            return f"{parsed.scheme}://{parsed.netloc}"
+
+    return candidate.rstrip("/")

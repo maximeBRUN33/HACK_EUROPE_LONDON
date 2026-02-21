@@ -58,11 +58,12 @@ For this sprint, these endpoints are **frozen** and both roles should treat resp
 5. `GET /api/runs/{run_id}/lineage-graph`
 6. `GET /api/runs/{run_id}/risk-summary`
 7. `GET /api/runs/{run_id}/node/{node_id}/evidence`
-8. `POST /api/copilot/query`
-9. `GET /api/integrations/mcp/status`
-10. `POST /api/integrations/codewords/trigger`
-11. `GET /api/integrations/codewords/result/{request_id}`
-12. `GET /api/integrations/dust/status`
+8. `GET /api/runs/{run_id}/enrichment`
+9. `POST /api/copilot/query`
+10. `GET /api/integrations/mcp/status`
+11. `POST /api/integrations/codewords/trigger`
+12. `GET /api/integrations/codewords/result/{request_id}`
+13. `GET /api/integrations/dust/status`
 
 Contract rules:
 - No renaming of existing keys in current payloads.
@@ -83,6 +84,7 @@ Contract rules:
 | `GET /api/runs/{run_id}/lineage-graph` | path params | `run_id`, `nodes[]`, `edges[]` | Role A | Data lineage and integration direction |
 | `GET /api/runs/{run_id}/risk-summary` | path params | `run_id`, `overall_score`, `findings[]` | Role A | Risk and migration panel |
 | `GET /api/runs/{run_id}/node/{node_id}/evidence` | path params | `run_id`, `node_id`, `files[]`, `symbols[]`, `explanation` | Role A | Evidence drawer |
+| `GET /api/runs/{run_id}/enrichment` | path params | `run_id`, `provider`, `status`, `service_id`, `request_id`, `ontology_enrichment`, `migration_hints`, `quality_checks`, `raw` | Role A | Ontology/migration enrichment panel |
 | `POST /api/copilot/query` | `run_id`, `question`, `focus_node_id?` | `answer`, `citations[]`, `risk_implications[]`, `related_nodes[]` | Role A | Developer enablement assistant |
 | `GET /api/integrations/mcp/status` | none | `source`, `exists`, `servers` | Role A | Integration badges |
 | `POST /api/integrations/codewords/trigger` | `service_id`, `inputs`, `async_mode` | `provider`, `service_id`, `status`, `request_id`, `raw` | Role A | Backend integration checks |
@@ -186,3 +188,14 @@ P2:
 3. Role A: add additive ontology/migration summary fields without breaking endpoint contract.
 4. Role B: build first ontology layer toggle UI with existing graph endpoints.
 5. Sync once after these are done, then start P1 items in parallel.
+
+## 10) Current checkpoint (updated)
+
+Completed by Role A:
+- CodeWords runtime hook is executed from the post-analysis path.
+- Analysis summary contract is normalized before CodeWords calls (`analysis_mode`, graph/risk counters, scan counters).
+- CodeWords enrichment is persisted as a dedicated artifact and exposed on `GET /api/runs/{run_id}/enrichment`.
+
+Next for Role B:
+- Consume `GET /api/runs/{run_id}/enrichment` and surface `ontology_enrichment`, `migration_hints`, and `quality_checks`.
+- Keep endpoint usage additive-only per freeze rules.

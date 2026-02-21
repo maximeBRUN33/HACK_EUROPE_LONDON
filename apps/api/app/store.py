@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from app.models import AnalysisRun, EvidencePayload, GraphPayload, Repository, RiskSummaryPayload
+from app.models import AnalysisRun, EnrichmentPayload, EvidencePayload, GraphPayload, Repository, RiskSummaryPayload
 from app.persistence.sqlite_store import SQLiteStore
 
 DB_PATH = Path(__file__).resolve().parents[3] / "data" / "legacy_atlas.db"
@@ -19,6 +19,7 @@ class AppStore:
     lineage_graphs: dict[UUID, GraphPayload] = field(default_factory=dict)
     risk_summaries: dict[UUID, RiskSummaryPayload] = field(default_factory=dict)
     evidences: dict[tuple[UUID, str], EvidencePayload] = field(default_factory=dict)
+    enrichments: dict[UUID, EnrichmentPayload] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -126,6 +127,21 @@ class AppStore:
         self.evidences[(payload.run_id, node_id)] = payload
         return payload
 
+    def save_enrichment(self, run_id: UUID, payload: EnrichmentPayload) -> None:
+        self.enrichments[run_id] = payload
+        self.sqlite.save_enrichment(str(run_id), payload)
+
+    def get_enrichment(self, run_id: str) -> EnrichmentPayload | None:
+        for key, payload in self.enrichments.items():
+            if str(key) == run_id:
+                return payload
+
+        payload = self.sqlite.get_enrichment(run_id)
+        if payload is None:
+            return None
+        self.enrichments[payload.run_id] = payload
+        return payload
+
     def clear_all(self) -> None:
         self.repositories.clear()
         self.runs.clear()
@@ -133,6 +149,7 @@ class AppStore:
         self.lineage_graphs.clear()
         self.risk_summaries.clear()
         self.evidences.clear()
+        self.enrichments.clear()
         self.sqlite.clear_all()
 
 
