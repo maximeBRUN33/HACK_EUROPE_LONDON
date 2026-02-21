@@ -19,6 +19,7 @@ def query_copilot(payload: CopilotRequest) -> CopilotResponse:
 
     risk = store.get_risk_summary(str(payload.run_id))
     graph = store.get_workflow_graph(str(payload.run_id))
+    enrichment = store.get_enrichment(str(payload.run_id))
 
     if risk is None or graph is None:
         raise HTTPException(status_code=400, detail="Run exists but semantic artifacts are not ready")
@@ -40,6 +41,7 @@ def query_copilot(payload: CopilotRequest) -> CopilotResponse:
         "workflow_edges": [edge.model_dump() for edge in graph.edges[:20]],
         "risk_findings": [finding.model_dump() for finding in risk.findings[:8]],
         "focus_evidence": focus_evidence.model_dump() if focus_evidence else None,
+        "codewords_enrichment": enrichment.model_dump() if enrichment else None,
     }
 
     node_evidence_map = []
@@ -77,15 +79,18 @@ def query_copilot(payload: CopilotRequest) -> CopilotResponse:
                     for file_path, symbol in zip(focus_evidence.files[:3], focus_evidence.symbols[:3], strict=False)
                 ]
 
+            if not semantic.answer.strip():
+                raise RuntimeError("Dust semantic answer was empty")
+
             return CopilotResponse(
                 answer=semantic.answer,
                 citations=citations,
                 risk_implications=semantic.risk_implications or ["Dust returned no explicit implications"],
                 related_nodes=semantic.related_nodes or [node.id for node in graph.nodes[:5]],
             )
-        except RuntimeError:
+        except RuntimeError as exc:
             # Fall through to local fallback when Dust is temporarily unavailable.
-            logger.warning("Dust semantic copilot unavailable; using local fallback run_id=%s", payload.run_id)
+            logger.warning("Dust semantic copilot unavailable; using local fallback run_id=%s error=%s", payload.run_id, exc)
             pass
 
     top_risk = max(risk.findings, key=lambda finding: finding.score)

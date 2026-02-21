@@ -19,6 +19,7 @@ class IngestionResult:
     local_path: Path | None
     mode: str
     message: str
+    resolved_branch: str | None = None
 
 
 def prepare_repository_source(repository: Repository) -> IngestionResult:
@@ -27,17 +28,36 @@ def prepare_repository_source(repository: Repository) -> IngestionResult:
         local = Path(repository.local_path).expanduser()
         if local.is_dir() and any(local.rglob("*.py")):
             logger.info("Using provided local path repo=%s/%s path=%s", repository.owner, repository.name, local)
-            return IngestionResult(local_path=local, mode="local", message="Using user-provided local path")
+            return IngestionResult(
+                local_path=local,
+                mode="local",
+                message="Using user-provided local path",
+                resolved_branch=repository.default_branch or None,
+            )
 
     if os.getenv("LEGACY_ATLAS_ENABLE_GIT_INGESTION", "1") != "1":
         logger.info("Git ingestion disabled repo=%s/%s", repository.owner, repository.name)
-        return IngestionResult(local_path=None, mode="fallback", message="Git ingestion disabled by environment")
+        return IngestionResult(
+            local_path=None,
+            mode="fallback",
+            message="Git ingestion disabled by environment",
+            resolved_branch=repository.default_branch or None,
+        )
 
     CACHE_ROOT.mkdir(parents=True, exist_ok=True)
     repo_dir = CACHE_ROOT / f"{repository.owner}__{repository.name}"
 
     repo_url = str(repository.repo_url)
-    branch = repository.default_branch or "main"
+    requested_branch = repository.default_branch or "main"
+    branch = _resolve_effective_branch(repo_url, requested_branch) or requested_branch
+    if branch != requested_branch:
+        logger.warning(
+            "Requested branch unavailable; using resolved branch repo=%s/%s requested=%s resolved=%s",
+            repository.owner,
+            repository.name,
+            requested_branch,
+            branch,
+        )
 
     if not repo_dir.exists():
         logger.info("Cloning repository repo=%s/%s branch=%s cache_path=%s", repository.owner, repository.name, branch, repo_dir)
@@ -73,7 +93,7 @@ def prepare_repository_source(repository: Repository) -> IngestionResult:
 
         if not clone_result[0]:
             logger.warning("Clone failed repo=%s/%s reason=%s", repository.owner, repository.name, clone_result[1])
-            return IngestionResult(local_path=None, mode="fallback", message=clone_result[1])
+            return IngestionResult(local_path=None, mode="fallback", message=clone_result[1], resolved_branch=branch)
     else:
         logger.info("Refreshing cached repository repo=%s/%s branch=%s cache_path=%s", repository.owner, repository.name, branch, repo_dir)
         fetch_result = _run_command(["git", "-C", str(repo_dir), "fetch", "origin", branch, "--depth", "1"])
@@ -82,13 +102,38 @@ def prepare_repository_source(repository: Repository) -> IngestionResult:
             _run_command(["git", "-C", str(repo_dir), "pull", "--ff-only", "origin", branch])
         else:
             logger.warning("Fetch failed repo=%s/%s reason=%s", repository.owner, repository.name, fetch_result[1])
+            remote_default = _discover_remote_default_branch(repo_url)
+            if remote_default and remote_default != branch:
+                logger.warning(
+                    "Retrying cached repo refresh with remote default repo=%s/%s branch=%s",
+                    repository.owner,
+                    repository.name,
+                    remote_default,
+                )
+                branch = remote_default
+                retry = _run_command(["git", "-C", str(repo_dir), "fetch", "origin", branch, "--depth", "1"])
+                if retry[0]:
+                    _run_command(["git", "-C", str(repo_dir), "checkout", branch])
+                    _run_command(["git", "-C", str(repo_dir), "pull", "--ff-only", "origin", branch])
+                else:
+                    logger.warning("Fallback fetch failed repo=%s/%s reason=%s", repository.owner, repository.name, retry[1])
 
     if repo_dir.is_dir() and any(repo_dir.rglob("*.py")):
         logger.info("Repository source prepared repo=%s/%s mode=git-clone path=%s branch=%s", repository.owner, repository.name, repo_dir, branch)
-        return IngestionResult(local_path=repo_dir, mode="git-clone", message=f"Repository prepared in local cache (branch={branch})")
+        return IngestionResult(
+            local_path=repo_dir,
+            mode="git-clone",
+            message=f"Repository prepared in local cache (branch={branch})",
+            resolved_branch=branch,
+        )
 
     logger.warning("No Python files found after ingestion repo=%s/%s", repository.owner, repository.name)
-    return IngestionResult(local_path=None, mode="fallback", message="No Python files found after ingestion")
+    return IngestionResult(
+        local_path=None,
+        mode="fallback",
+        message="No Python files found after ingestion",
+        resolved_branch=branch,
+    )
 
 
 def _run_command(command: list[str], timeout: int = 120) -> tuple[bool, str]:
@@ -133,6 +178,19 @@ def _discover_remote_default_branch(repo_url: str) -> str | None:
     if not match:
         return None
     return match.group(1)
+
+
+def _resolve_effective_branch(repo_url: str, requested_branch: str) -> str | None:
+    if _branch_exists(repo_url, requested_branch):
+        return requested_branch
+    return _discover_remote_default_branch(repo_url)
+
+
+def _branch_exists(repo_url: str, branch: str) -> bool:
+    ok, output = _run_command(["git", "ls-remote", "--heads", repo_url, branch], timeout=30)
+    if not ok:
+        return False
+    return bool(output.strip())
 
 
 def _is_missing_branch_error(message: str) -> bool:

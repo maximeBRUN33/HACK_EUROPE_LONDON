@@ -41,6 +41,7 @@ If no local path is available, the API returns fallback synthetic artifacts.
   - `ontology` (entities, capability clusters, inbound/outbound integration counts)
   - `migration` (readiness score, extraction boundaries, impacted modules, rerouting risks)
   - required analysis counters (`analysis_mode`, `workflow_nodes`, `lineage_edges`, `risk_findings`, `files_scanned`, `functions_scanned`, `parse_errors`)
+  - `ingestion_branch` (effective branch used after branch auto-resolution)
   - `codewords_runtime` (post-analysis workflow trigger/poll status)
 - `GET /api/runs/{run_id}/enrichment` returns normalized CodeWords ontology/migration enrichment payload persisted as an artifact.
 

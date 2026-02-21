@@ -8,6 +8,7 @@ os.environ["LEGACY_ATLAS_ENABLE_GIT_INGESTION"] = "0"
 os.environ["LEGACY_ATLAS_CODEWORDS_RUNTIME_HOOK"] = "0"
 
 from app.main import app
+from app.services.dust_client import DustSemanticResponse
 from app.store import store
 
 
@@ -124,6 +125,65 @@ def test_end_to_end_scan_and_graphs(tmp_path: Path) -> None:
     assert run["summary"]["analysis_mode"] == "ast-local"
 
 
+def test_manual_cli_flow_sequence(tmp_path: Path) -> None:
+    _build_sample_python_repo(tmp_path)
+    register = client.post(
+        "/api/repos/register",
+        json={
+            "repo_url": "https://github.com/frappe/erpnext",
+            "default_branch": "develop",
+            "local_path": str(tmp_path),
+        },
+    )
+    assert register.status_code == 200
+    repo = register.json()
+
+    scan = client.post(
+        f"/api/repos/{repo['id']}/scan",
+        json={"commit_sha": "manual-seq-001"},
+    )
+    assert scan.status_code == 200
+    run = scan.json()
+
+    run_status = client.get(f"/api/repos/{repo['id']}/runs/{run['id']}")
+    assert run_status.status_code == 200
+    status_payload = run_status.json()
+    assert status_payload["status"] == "completed"
+    assert status_payload["current_step"] == "completed"
+    assert status_payload["summary"]["ingestion_mode"] == "local"
+    assert status_payload["summary"]["ingestion_branch"] == "develop"
+
+    workflow = client.get(f"/api/runs/{run['id']}/workflow-graph")
+    lineage = client.get(f"/api/runs/{run['id']}/lineage-graph")
+    risk = client.get(f"/api/runs/{run['id']}/risk-summary")
+    enrichment = client.get(f"/api/runs/{run['id']}/enrichment")
+
+    assert workflow.status_code == 200
+    assert lineage.status_code == 200
+    assert risk.status_code == 200
+    assert enrichment.status_code == 200
+    assert enrichment.json()["status"] == "disabled"
+
+    first_node = workflow.json()["nodes"][0]["id"]
+    evidence = client.get(f"/api/runs/{run['id']}/node/{first_node}/evidence")
+    assert evidence.status_code == 200
+
+    copilot = client.post(
+        "/api/copilot/query",
+        json={
+            "run_id": run["id"],
+            "question": "Where is the sales confirmation logic?",
+            "focus_node_id": first_node,
+        },
+    )
+    assert copilot.status_code == 200
+    copilot_payload = copilot.json()
+    assert isinstance(copilot_payload["answer"], str) and copilot_payload["answer"]
+    assert isinstance(copilot_payload["citations"], list) and len(copilot_payload["citations"]) >= 1
+    assert isinstance(copilot_payload["risk_implications"], list)
+    assert isinstance(copilot_payload["related_nodes"], list)
+
+
 def test_copilot_returns_citations(tmp_path: Path) -> None:
     _build_sample_python_repo(tmp_path)
     repo = client.post(
@@ -153,6 +213,61 @@ def test_copilot_returns_citations(tmp_path: Path) -> None:
     assert isinstance(payload["risk_implications"], list)
     assert "related_nodes" in payload
     assert isinstance(payload["related_nodes"], list)
+
+
+def test_copilot_prefers_dust_when_configured(monkeypatch, tmp_path: Path) -> None:
+    _build_sample_python_repo(tmp_path)
+    repo = client.post(
+        "/api/repos/register",
+        json={
+            "repo_url": "https://github.com/odoo/odoo",
+            "default_branch": "master",
+            "local_path": str(tmp_path),
+        },
+    ).json()
+
+    run = client.post(
+        f"/api/repos/{repo['id']}/scan",
+        json={"commit_sha": "seed-002"},
+    ).json()
+
+    calls = {"semantic": 0}
+
+    class FakeDust:
+        def is_configured(self) -> bool:
+            return True
+
+        def semantic_copilot(self, *, question: str, context: dict) -> DustSemanticResponse:
+            calls["semantic"] += 1
+            assert question
+            assert "codewords_enrichment" in context
+            return DustSemanticResponse(
+                answer="Dust grounded answer",
+                citations=[
+                    {
+                        "file_path": "services/workflow.py",
+                        "symbol": "confirm_order",
+                        "reason": "Grounded in workflow evidence",
+                        "line_start": 1,
+                        "line_end": 8,
+                    }
+                ],
+                risk_implications=["coupling risk"],
+                related_nodes=[context["focus_node_id"]],
+                raw_text="{}",
+            )
+
+    monkeypatch.setattr("app.routers.copilot.DustClient", FakeDust)
+
+    response = client.post(
+        "/api/copilot/query",
+        json={"run_id": run["id"], "question": "Where is sales confirmation logic?"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["answer"] == "Dust grounded answer"
+    assert payload["citations"][0]["file_path"] == "services/workflow.py"
+    assert calls["semantic"] == 1
 
 
 def test_mcp_status_endpoint_exposes_server_names_without_secrets() -> None:

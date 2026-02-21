@@ -58,8 +58,11 @@ def _run_job(run_id: str, repo_id: str) -> None:
 
         if ingestion.local_path is not None:
             repository.local_path = str(ingestion.local_path)
-            store.save_repository(repository)
             logger.info("Repository local path updated run_id=%s path=%s", run_id, repository.local_path)
+        if ingestion.resolved_branch:
+            repository.default_branch = ingestion.resolved_branch
+            logger.info("Repository branch resolved run_id=%s branch=%s", run_id, repository.default_branch)
+        store.save_repository(repository)
 
         run = store.get_run(run_id)
         if run is None:
@@ -70,6 +73,7 @@ def _run_job(run_id: str, repo_id: str) -> None:
             **create_placeholder_summary(repository, run.commit_sha),
             "ingestion_mode": ingestion.mode,
             "ingestion_message": ingestion.message,
+            "ingestion_branch": ingestion.resolved_branch or repository.default_branch,
         }
         store.save_run(run)
 
@@ -78,6 +82,7 @@ def _run_job(run_id: str, repo_id: str) -> None:
             logger.info("Analysis progress run_id=%s step=%s progress=%.1f", run_id, step, pct)
 
         run_static_analysis(run, repository, progress_cb=progress)
+        _attach_ingestion_telemetry(run_id=run_id, ingestion=ingestion)
         _attach_codewords_runtime_result(run_id=run_id, repository=repository)
         _update_run(run_id, status=RunStatus.completed, step="completed", progress=100.0, finished=True)
         logger.info("Analysis job completed run_id=%s", run_id)
@@ -130,6 +135,26 @@ def _attach_codewords_runtime_result(run_id: str, repository) -> None:
     store.save_run(run)
     store.save_enrichment(run.id, _build_enrichment_payload(run, result))
     logger.info("CodeWords enrichment persisted run_id=%s status=%s", run_id, result.get("status"))
+
+
+def _attach_ingestion_telemetry(run_id: str, ingestion) -> None:
+    run = store.get_run(run_id)
+    if run is None:
+        return
+
+    run.summary = {
+        **run.summary,
+        "ingestion_mode": ingestion.mode,
+        "ingestion_message": ingestion.message,
+        "ingestion_branch": ingestion.resolved_branch,
+    }
+    store.save_run(run)
+    logger.info(
+        "Ingestion telemetry persisted run_id=%s mode=%s branch=%s",
+        run_id,
+        ingestion.mode,
+        ingestion.resolved_branch or "",
+    )
 
 
 def _execute_codewords_runtime_hook(run_id: str, repository) -> dict:
