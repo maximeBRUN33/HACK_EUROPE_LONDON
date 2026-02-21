@@ -16,6 +16,7 @@ from app.services.python_ast import (
     compute_degrees,
     count_entities,
 )
+from app.services.semantic import SemanticEnricher
 from app.store import store
 
 ENTRYPOINT_HINTS = ("confirm", "submit", "process", "assign", "post", "create", "run", "execute")
@@ -513,6 +514,16 @@ def run_static_analysis(
 
     for node_id, payload in evidences.items():
         store.save_evidence(run.id, node_id, payload)
+
+    if repo_root:
+        enricher = SemanticEnricher()
+        if enricher.is_available():
+            run.current_step = "semantic-enrichment"
+            run.progress_pct = 90.0
+            update_progress("semantic-enrichment", 90.0)
+
+            enricher.enrich_workflow_graph(run, workflow_graph, workflow_node_map)
+            enricher.enrich_risk_summary(run, risk_summary)
 
     run.status = RunStatus.completed
     run.current_step = "completed"
