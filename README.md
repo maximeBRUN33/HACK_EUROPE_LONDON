@@ -4,6 +4,7 @@
 
 > Built for the [{Tech: Europe} London Hackathon](https://techeurope.io) — Conduct Track
 
+![HomePage](docs/assets/homepage.jpeg)
 
 ---
 
