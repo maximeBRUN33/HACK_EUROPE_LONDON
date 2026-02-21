@@ -229,12 +229,14 @@ def test_manual_cli_flow_sequence(tmp_path: Path) -> None:
 def test_integrations_readiness_endpoint(monkeypatch) -> None:
     class FakeCodeWords:
         base_url = "https://runtime.codewords.ai"
+        ssl_context = None
 
         def is_configured(self) -> bool:
             return True
 
     class FakeDust:
         base_url = "https://dust.tt/api/v1"
+        ssl_context = None
 
         def is_configured(self) -> bool:
             return True
@@ -245,7 +247,7 @@ def test_integrations_readiness_endpoint(monkeypatch) -> None:
         "app.routers.integrations.load_mcp_config",
         lambda: {"exists": True, "mcpServers": {"CodeWords": {"url": "https://runtime.codewords.ai/run/devx_mcp/mcp/"}}},
     )
-    monkeypatch.setattr("app.routers.integrations._probe_url", lambda _url, timeout_sec=4.0: (True, 12, None))
+    monkeypatch.setattr("app.routers.integrations._probe_url", lambda _url, timeout_sec=4.0, ssl_context=None: (True, 12, None))
 
     response = client.get("/api/integrations/readiness")
     assert response.status_code == 200

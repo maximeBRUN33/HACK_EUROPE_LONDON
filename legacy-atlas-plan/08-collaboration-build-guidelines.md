@@ -100,6 +100,68 @@ Rules for avoiding merge issues:
 - Role A can add optional fields only; if required fields are needed, coordinate same-day with Role B.
 - Endpoint docs in this table are the single source of truth for this sprint.
 
+### Endpoint purpose map (why each endpoint exists, and when to call it)
+
+1. `POST /api/repos/register`
+- Purpose: create a canonical repository record and parsing context (owner/name/branch/local path).
+- Use it when: user submits a repo in intake form.
+
+2. `POST /api/repos/{repo_id}/scan`
+- Purpose: create and queue an analysis run; start ingestion + AST + artifact generation.
+- Use it when: user clicks Start Analysis.
+
+3. `GET /api/repos/{repo_id}/runs/{run_id}`
+- Purpose: track run lifecycle and progress telemetry.
+- Use it when: polling run status until completed/failed.
+
+4. `GET /api/runs/{run_id}/workflow-graph`
+- Purpose: provide the process explorer graph (execution/control relationships).
+- Use it when: rendering Process Atlas.
+
+5. `GET /api/runs/{run_id}/lineage-graph`
+- Purpose: provide the data lineage graph (entity transition relationships).
+- Use it when: rendering Data Lineage Navigator.
+
+6. `GET /api/runs/{run_id}/risk-summary`
+- Purpose: provide prioritization data (overall score + findings + rationale + suggestions).
+- Use it when: rendering Risk Observatory and migration urgency cues.
+
+7. `GET /api/runs/{run_id}/node/{node_id}/evidence`
+- Purpose: explain why a node exists using files/symbols/explanation traceability.
+- Use it when: user selects a workflow or lineage node.
+
+8. `GET /api/runs/{run_id}/enrichment`
+- Purpose: return post-analysis semantic augmentation from CodeWords (ontology enrichment, migration hints, quality checks).
+- Use it when: enriching interpretation panels beyond core static artifacts.
+
+9. `GET /api/runs/{run_id}/migration-blueprint`
+- Purpose: return an execution-ready migration plan synthesized from run summary + risk + lineage (+ enrichment if available).
+- Use it when: user enters migration planning mode.
+
+10. `POST /api/copilot/query`
+- Purpose: provide developer Q/A grounded in run artifacts, evidence, risks, and optional Dust semantics.
+- Use it when: user asks “what depends on this?”, “what breaks if I change X?”.
+
+11. `GET /api/integrations/mcp/status`
+- Purpose: show loaded MCP server config summary.
+- Use it when: debugging tool connectivity and environment setup.
+
+12. `POST /api/integrations/codewords/trigger`
+- Purpose: manually trigger a specific CodeWords workflow for testing or ad-hoc enrichment.
+- Use it when: integration validation and controlled workflow testing.
+
+13. `GET /api/integrations/codewords/result/{request_id}`
+- Purpose: poll status/result of a previously triggered CodeWords workflow.
+- Use it when: async workflow monitoring.
+
+14. `GET /api/integrations/dust/status`
+- Purpose: indicate whether Dust workspace/config is present.
+- Use it when: deciding Dust copilot availability UI state.
+
+15. `GET /api/integrations/readiness`
+- Purpose: provide health snapshot of integrations (`configured`, `reachable`, `latency_ms`, `detail`) to decide confidence and fallbacks.
+- Use it when: showing integration health badges and operational diagnostics.
+
 ## 5) Parallel work boundaries
 
 Allowed in parallel without coordination:
@@ -222,6 +284,32 @@ Render and state-handling requirements:
 - Enrichment panel: show `status`, `ontology_enrichment`, `migration_hints`, `quality_checks`.
 - Migration panel: show `readiness_score`, `readiness_band`, `top_risks`, `phased_plan`.
 - Integration badges: show `configured`, `reachable`, and optional `latency_ms`.
+
+What each of these three means in product terms:
+
+1. `GET /api/runs/{run_id}/enrichment`
+- What it is: semantic augmentation generated after core analysis (usually via CodeWords).
+- What it is for: make ontology and migration interpretation smarter than pure heuristics.
+- Important behavior: this can be `not_configured`, `queued`, `running`, `completed`, `failed`, or `error`; UI must not block core graph views if enrichment is unavailable.
+
+2. `GET /api/runs/{run_id}/migration-blueprint`
+- What it is: a structured migration plan object built from existing analysis artifacts.
+- What it is for: move from “understand system” to “execute migration safely.”
+- Important behavior: this is decision support, not raw telemetry. It packages readiness, top risks, extraction boundaries, integration routing risks, and phased plan for action.
+
+3. `GET /api/integrations/readiness`
+- What it is: operational health and connectivity status of CodeWords, Dust, and MCP.
+- What it is for: determine trust level of AI/enrichment outputs and show clear setup/debug states.
+- Important behavior: readiness explains why features are degraded (not configured vs configured but unreachable), so UI should surface this before users assume backend bugs.
+
+Recommended UI call timing:
+
+1. On run completion:
+- Fetch `workflow-graph`, `lineage-graph`, `risk-summary` in parallel (core required views).
+- Fetch `enrichment` and `migration-blueprint` right after (advanced views).
+
+2. On app/init or settings open:
+- Fetch `integrations/readiness` to set integration banners and badges.
 
 Error handling contract:
 - API errors now include `detail.detail_code` and `detail.message`.

@@ -5,6 +5,7 @@ import { RepoIntakePanel } from "./components/RepoIntakePanel";
 import { RiskPanel } from "./components/RiskPanel";
 import {
   askCopilot,
+  compareCopilotWithWeb,
   fetchDustStatus,
   fetchIntegrationsReadiness,
   fetchLineageGraph,
@@ -18,6 +19,7 @@ import {
   registerRepository,
   startScan,
   type CopilotResponse,
+  type CopilotWebCompareResponse,
   type EnrichmentPayload,
   type EvidencePayload,
   type GraphPayload,
@@ -38,6 +40,7 @@ type AppState = {
   riskSummary: RiskSummary | null;
   enrichment: EnrichmentPayload | null;
   copilot: CopilotResponse | null;
+  copilotWebCompare: CopilotWebCompareResponse | null;
 };
 
 const initialState: AppState = {
@@ -49,7 +52,8 @@ const initialState: AppState = {
   lineageEvidence: null,
   riskSummary: null,
   enrichment: null,
-  copilot: null
+  copilot: null,
+  copilotWebCompare: null
 };
 
 export function App(): JSX.Element {
@@ -67,6 +71,8 @@ export function App(): JSX.Element {
   const [integrationsReadiness, setIntegrationsReadiness] = useState<IntegrationsReadinessResponse | null>(null);
   const [migrationBlueprint, setMigrationBlueprint] = useState<MigrationBlueprintPayload | null>(null);
   const [blueprintLoading, setBlueprintLoading] = useState(false);
+  const [copilotWebCompareBusy, setCopilotWebCompareBusy] = useState(false);
+  const [copilotWebCompareError, setCopilotWebCompareError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDustStatus()
@@ -95,7 +101,7 @@ export function App(): JSX.Element {
     try {
       const repo = await registerRepository(repoUrl, "main", localPath || undefined);
       const queuedRun = await startScan(repo.id, commitSha);
-      setState((current) => ({ ...current, repo, run: queuedRun, copilot: null }));
+      setState((current) => ({ ...current, repo, run: queuedRun, copilot: null, copilotWebCompare: null }));
 
       const completedRun = await pollRunUntilCompleted(repo.id, queuedRun.id, (run) => {
         setState((current) => ({ ...current, run }));
@@ -121,7 +127,8 @@ export function App(): JSX.Element {
         lineageEvidence: null,
         riskSummary,
         enrichment,
-        copilot: null
+        copilot: null,
+        copilotWebCompare: null
       }));
 
       setActiveTab("process");
@@ -216,9 +223,21 @@ export function App(): JSX.Element {
     }
 
     setCopilotBusy(true);
+    setCopilotWebCompareBusy(false);
+    setCopilotWebCompareError(null);
     try {
       const copilot = await askCopilot(state.run.id, question);
-      setState((current) => ({ ...current, copilot }));
+      setState((current) => ({ ...current, copilot, copilotWebCompare: null }));
+
+      setCopilotWebCompareBusy(true);
+      try {
+        const webCompare = await compareCopilotWithWeb(state.run.id, question, copilot.answer, 6, ["reddit", "x"]);
+        setState((current) => ({ ...current, copilotWebCompare: webCompare }));
+      } catch (error) {
+        setCopilotWebCompareError(error instanceof Error ? error.message : "Failed to load web comparison");
+      } finally {
+        setCopilotWebCompareBusy(false);
+      }
     } finally {
       setCopilotBusy(false);
     }
@@ -269,7 +288,7 @@ export function App(): JSX.Element {
             <span className="int-badge int-ok">AI Enriched {"\u2713"}</span>
           )}
         </div>
-        <button className="new-analysis-btn" onClick={() => { setState(initialState); setShowDashboard(false); setActiveTab("scan"); setMigrationBlueprint(null); }}>
+        <button className="new-analysis-btn" onClick={() => { setState(initialState); setShowDashboard(false); setActiveTab("scan"); setMigrationBlueprint(null); setCopilotWebCompareBusy(false); setCopilotWebCompareError(null); }}>
           New Analysis &rarr;
         </button>
       </header>
@@ -362,7 +381,17 @@ export function App(): JSX.Element {
         )}
 
         {activeTab === "copilot" && (
-          <CopilotPanel runId={state.run?.id ?? null} response={state.copilot} isBusy={copilotBusy} onAsk={handleAsk} onFocusNode={handleFocusNode} symbolNodeMap={symbolNodeMap} />
+          <CopilotPanel
+            runId={state.run?.id ?? null}
+            response={state.copilot}
+            webCompare={state.copilotWebCompare}
+            webCompareBusy={copilotWebCompareBusy}
+            webCompareError={copilotWebCompareError}
+            isBusy={copilotBusy}
+            onAsk={handleAsk}
+            onFocusNode={handleFocusNode}
+            symbolNodeMap={symbolNodeMap}
+          />
         )}
       </main>
     </div>

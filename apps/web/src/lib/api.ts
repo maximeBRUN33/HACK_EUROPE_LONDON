@@ -70,6 +70,23 @@ export type CopilotResponse = {
   related_nodes: string[];
 };
 
+export type WebReferenceItem = {
+  platform: "reddit" | "x" | "other";
+  title: string;
+  url: string;
+  snippet: string;
+  why_relevant: string;
+};
+
+export type CopilotWebCompareResponse = {
+  provider: string;
+  model: string;
+  status: string;
+  summary: string;
+  items: WebReferenceItem[];
+  raw: Record<string, unknown>;
+};
+
 export type EvidencePayload = {
   run_id: string;
   node_id: string;
@@ -196,6 +213,39 @@ export async function askCopilot(runId: string, question: string): Promise<Copil
   });
   if (!response.ok) {
     throw new Error(`Copilot query failed (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function compareCopilotWithWeb(
+  runId: string,
+  question: string,
+  answer: string,
+  maxResults = 6,
+  platforms: Array<"reddit" | "x" | "other"> = ["reddit", "x"]
+): Promise<CopilotWebCompareResponse> {
+  const response = await fetch(`${API_BASE}/api/copilot/web-compare`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      run_id: runId,
+      question,
+      answer,
+      max_results: maxResults,
+      platforms
+    })
+  });
+  if (!response.ok) {
+    let message = `Copilot web comparison failed (${response.status})`;
+    try {
+      const body = await response.json();
+      if (body?.detail?.detail_code) {
+        message = `${body.detail.detail_code}: ${body.detail.message ?? message}`;
+      }
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(message);
   }
   return response.json();
 }

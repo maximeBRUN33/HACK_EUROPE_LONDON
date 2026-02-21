@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import ssl
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
@@ -32,7 +33,14 @@ class GeminiClient:
         self.base_url = os.getenv("GEMINI_API_BASE_URL", "https://generativelanguage.googleapis.com").rstrip("/")
         self.api_key = os.getenv("GEMINI_API_KEY", "").strip()
         self.model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip() or "gemini-2.0-flash"
+        self.ssl_verify = os.getenv("GEMINI_SSL_VERIFY", "1").strip() not in {"0", "false", "False"}
+        self.ca_bundle = os.getenv("GEMINI_CA_BUNDLE", "").strip()
+        self.ssl_context = _build_ssl_context(verify=self.ssl_verify, ca_bundle=self.ca_bundle)
         self.logger = logging.getLogger(__name__)
+        if not self.ssl_verify:
+            self.logger.warning("Gemini SSL verification disabled via GEMINI_SSL_VERIFY=0 (development only)")
+        elif self.ca_bundle:
+            self.logger.info("Gemini custom CA bundle configured path=%s", self.ca_bundle)
 
     def is_configured(self) -> bool:
         return bool(self.api_key)
@@ -52,7 +60,6 @@ class GeminiClient:
             "tools": [{"google_search": {}}],
             "generationConfig": {
                 "temperature": 0.2,
-                "responseMimeType": "application/json",
             },
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         }
@@ -69,7 +76,7 @@ class GeminiClient:
         request = Request(url=url, data=body, method="POST")
         request.add_header("Content-Type", "application/json")
         try:
-            with urlopen(request, timeout=30) as response:  # noqa: S310
+            with urlopen(request, timeout=30, context=self.ssl_context) as response:  # noqa: S310
                 text = response.read().decode("utf-8")
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="ignore")
@@ -273,3 +280,26 @@ def _dedupe_items(items: list[GeminiWebItem]) -> list[GeminiWebItem]:
         seen.add(item.url)
         deduped.append(item)
     return deduped
+
+
+def _build_ssl_context(*, verify: bool, ca_bundle: str) -> ssl.SSLContext:
+    if not verify:
+        return ssl._create_unverified_context()
+
+    if ca_bundle:
+        return ssl.create_default_context(cafile=ca_bundle)
+
+    certifi_path = _resolve_certifi_path()
+    if certifi_path:
+        return ssl.create_default_context(cafile=certifi_path)
+
+    return ssl.create_default_context()
+
+
+def _resolve_certifi_path() -> str | None:
+    try:
+        import certifi  # type: ignore
+
+        return certifi.where()
+    except Exception:
+        return None

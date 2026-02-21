@@ -5,6 +5,7 @@ import os
 import re
 import time
 import logging
+import ssl
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -25,7 +26,14 @@ class DustClient:
         self.workspace_id = os.getenv("DUST_WORKSPACE_ID", "")
         self.api_key = os.getenv("DUST_API_KEY", "")
         self.configuration_id = os.getenv("DUST_ASSISTANT_CONFIGURATION_ID", "")
+        self.ssl_verify = os.getenv("DUST_SSL_VERIFY", "1").strip() not in {"0", "false", "False"}
+        self.ca_bundle = os.getenv("DUST_CA_BUNDLE", "").strip()
+        self.ssl_context = _build_ssl_context(verify=self.ssl_verify, ca_bundle=self.ca_bundle)
         self.logger = logging.getLogger(__name__)
+        if not self.ssl_verify:
+            self.logger.warning("Dust SSL verification disabled via DUST_SSL_VERIFY=0 (development only)")
+        elif self.ca_bundle:
+            self.logger.info("Dust custom CA bundle configured path=%s", self.ca_bundle)
 
     def is_configured(self) -> bool:
         return bool(self.workspace_id and self.api_key and self.configuration_id)
@@ -150,7 +158,7 @@ class DustClient:
         request.add_header("Content-Type", "application/json")
 
         try:
-            with urlopen(request, timeout=30) as response:  # noqa: S310
+            with urlopen(request, timeout=30, context=self.ssl_context) as response:  # noqa: S310
                 text = response.read().decode("utf-8")
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="ignore")
@@ -246,3 +254,26 @@ def _normalize_citations(citations: object) -> list[dict]:
                 }
             )
     return normalized
+
+
+def _build_ssl_context(*, verify: bool, ca_bundle: str) -> ssl.SSLContext:
+    if not verify:
+        return ssl._create_unverified_context()
+
+    if ca_bundle:
+        return ssl.create_default_context(cafile=ca_bundle)
+
+    certifi_path = _resolve_certifi_path()
+    if certifi_path:
+        return ssl.create_default_context(cafile=certifi_path)
+
+    return ssl.create_default_context()
+
+
+def _resolve_certifi_path() -> str | None:
+    try:
+        import certifi  # type: ignore
+
+        return certifi.where()
+    except Exception:
+        return None

@@ -4,6 +4,7 @@ import json
 import os
 import logging
 import re
+import ssl
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit
@@ -39,7 +40,14 @@ class CodeWordsClient:
                 self.api_key = resolved.split(" ", 1)[1].strip()
         if self.api_key and "${" in self.api_key:
             self.api_key = None
+        self.ssl_verify = os.getenv("CODEWORDS_SSL_VERIFY", "1").strip() not in {"0", "false", "False"}
+        self.ca_bundle = os.getenv("CODEWORDS_CA_BUNDLE", "").strip()
+        self.ssl_context = _build_ssl_context(verify=self.ssl_verify, ca_bundle=self.ca_bundle)
         self.logger = logging.getLogger(__name__)
+        if not self.ssl_verify:
+            self.logger.warning("CodeWords SSL verification disabled via CODEWORDS_SSL_VERIFY=0 (development only)")
+        elif self.ca_bundle:
+            self.logger.info("CodeWords custom CA bundle configured path=%s", self.ca_bundle)
 
     def is_configured(self) -> bool:
         return bool(self.base_url and self.api_key)
@@ -106,7 +114,7 @@ class CodeWordsClient:
 
     def _read_json(self, request: Request) -> dict:
         try:
-            with urlopen(request, timeout=20) as response:  # noqa: S310
+            with urlopen(request, timeout=20, context=self.ssl_context) as response:  # noqa: S310
                 text = response.read().decode("utf-8")
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="ignore")
@@ -158,3 +166,26 @@ def _normalize_runtime_base_url(url: str) -> str:
             return f"{parsed.scheme}://{parsed.netloc}"
 
     return candidate.rstrip("/")
+
+
+def _build_ssl_context(*, verify: bool, ca_bundle: str) -> ssl.SSLContext:
+    if not verify:
+        return ssl._create_unverified_context()
+
+    if ca_bundle:
+        return ssl.create_default_context(cafile=ca_bundle)
+
+    certifi_path = _resolve_certifi_path()
+    if certifi_path:
+        return ssl.create_default_context(cafile=certifi_path)
+
+    return ssl.create_default_context()
+
+
+def _resolve_certifi_path() -> str | None:
+    try:
+        import certifi  # type: ignore
+
+        return certifi.where()
+    except Exception:
+        return None

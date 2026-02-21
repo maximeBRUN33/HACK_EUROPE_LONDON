@@ -2093,6 +2093,114 @@ button:disabled {
   font-weight: 600;
 }
 
+.web-compare-card {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid #E5E7EB;
+  background: #F9FAFB;
+}
+
+.web-compare-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.web-compare-header h3 {
+  margin: 0;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-low);
+  font-weight: 600;
+}
+
+.web-compare-summary {
+  margin: 0 0 10px;
+  color: #374151;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.web-compare-list {
+  display: grid;
+  gap: 8px;
+}
+
+.web-compare-item {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #E5E7EB;
+  background: #FFFFFF;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.web-compare-item:hover {
+  border-color: var(--accent-cyan);
+  background: #EFF6FF;
+}
+
+.web-compare-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.web-compare-item-head strong {
+  color: #1A1A2E;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.web-compare-item p {
+  margin: 0;
+  color: var(--ink-mid);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.web-compare-why {
+  font-size: 0.78rem;
+  color: var(--accent-cyan);
+}
+
+.platform-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.platform-pill.reddit {
+  color: #B45309;
+  background: #FFFBEB;
+  border-color: #FCD34D;
+}
+
+.platform-pill.x {
+  color: #1E40AF;
+  background: #EFF6FF;
+  border-color: #93C5FD;
+}
+
+.platform-pill.other {
+  color: #374151;
+  background: #F3F4F6;
+  border-color: #D1D5DB;
+}
+
 /* KPI Summary Bar */
 .kpi-bar {
   display: flex;

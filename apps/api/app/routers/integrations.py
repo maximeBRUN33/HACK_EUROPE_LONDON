@@ -1,4 +1,6 @@
 import logging
+import os
+import ssl
 import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -117,9 +119,12 @@ def get_integrations_readiness() -> IntegrationReadinessResponse:
     dust = _dust_readiness()
     mcp = _mcp_readiness()
     logger.info(
-        "Integration readiness codewords=%s dust=%s mcp=%s",
+        "Integration readiness codewords=%s/%s dust=%s/%s mcp=%s/%s",
+        codewords.configured,
         codewords.reachable,
+        dust.configured,
         dust.reachable,
+        mcp.configured,
         mcp.reachable,
     )
     return IntegrationReadinessResponse(codewords=codewords, dust=dust, mcp=mcp)
@@ -129,7 +134,7 @@ def _codewords_readiness() -> IntegrationProviderReadiness:
     client = CodeWordsClient()
     if not client.is_configured():
         return IntegrationProviderReadiness(configured=False, reachable=False, detail="codewords_not_configured")
-    reachable, latency_ms, detail = _probe_url(f"{client.base_url}/health")
+    reachable, latency_ms, detail = _probe_url(f"{client.base_url}/health", ssl_context=client.ssl_context)
     return IntegrationProviderReadiness(
         configured=True,
         reachable=reachable,
@@ -142,7 +147,7 @@ def _dust_readiness() -> IntegrationProviderReadiness:
     client = DustClient()
     if not client.is_configured():
         return IntegrationProviderReadiness(configured=False, reachable=False, detail="dust_not_configured")
-    reachable, latency_ms, detail = _probe_url(client.base_url)
+    reachable, latency_ms, detail = _probe_url(client.base_url, ssl_context=client.ssl_context)
     return IntegrationProviderReadiness(
         configured=True,
         reachable=reachable,
@@ -168,21 +173,41 @@ def _mcp_readiness() -> IntegrationProviderReadiness:
     if not http_urls:
         return IntegrationProviderReadiness(configured=True, reachable=True, detail="mcp_config_loaded_no_http_probe")
 
-    probe_target = http_urls[0]
-    reachable, latency_ms, detail = _probe_url(probe_target)
+    ssl_context = _mcp_ssl_context()
+    probes = [(url, *_probe_url(url, ssl_context=ssl_context)) for url in http_urls]
+    reachable_probes = [item for item in probes if item[1]]
+    if reachable_probes:
+        # Pick the fastest reachable probe for display.
+        target, reachable, latency_ms, detail = sorted(reachable_probes, key=lambda item: item[2] or 10_000)[0]
+        resolved_detail = detail or f"ok:{target}"
+        return IntegrationProviderReadiness(
+            configured=True,
+            reachable=reachable,
+            latency_ms=latency_ms,
+            detail=resolved_detail,
+        )
+
+    detail = "; ".join(
+        f"{url}->{probe_detail or 'unreachable'}"
+        for url, _reachable, _latency_ms, probe_detail in probes
+    )
     return IntegrationProviderReadiness(
         configured=True,
-        reachable=reachable,
-        latency_ms=latency_ms,
-        detail=detail or f"probe:{probe_target}",
+        reachable=False,
+        latency_ms=None,
+        detail=detail or "all_mcp_http_probes_failed",
     )
 
 
-def _probe_url(url: str, timeout_sec: float = 4.0) -> tuple[bool, int | None, str | None]:
+def _probe_url(
+    url: str,
+    timeout_sec: float = 4.0,
+    ssl_context: ssl.SSLContext | None = None,
+) -> tuple[bool, int | None, str | None]:
     start = time.perf_counter()
     request = Request(url=url, method="GET")
     try:
-        with urlopen(request, timeout=timeout_sec) as response:  # noqa: S310
+        with urlopen(request, timeout=timeout_sec, context=ssl_context) as response:  # noqa: S310
             _ = response.read(1)
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         return True, elapsed_ms, None
@@ -192,3 +217,26 @@ def _probe_url(url: str, timeout_sec: float = 4.0) -> tuple[bool, int | None, st
         return True, elapsed_ms, f"http_{exc.code}"
     except URLError as exc:
         return False, None, str(exc.reason)
+
+
+def _mcp_ssl_context() -> ssl.SSLContext:
+    verify = os.getenv("MCP_SSL_VERIFY", "1").strip() not in {"0", "false", "False"}
+    ca_bundle = os.getenv("MCP_CA_BUNDLE", "").strip()
+    if not verify:
+        logger.warning("MCP readiness SSL verification disabled via MCP_SSL_VERIFY=0 (development only)")
+        return ssl._create_unverified_context()
+    if ca_bundle:
+        return ssl.create_default_context(cafile=ca_bundle)
+    certifi_path = _resolve_certifi_path()
+    if certifi_path:
+        return ssl.create_default_context(cafile=certifi_path)
+    return ssl.create_default_context()
+
+
+def _resolve_certifi_path() -> str | None:
+    try:
+        import certifi  # type: ignore
+
+        return certifi.where()
+    except Exception:
+        return None

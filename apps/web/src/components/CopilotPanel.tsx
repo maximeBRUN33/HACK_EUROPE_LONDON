@@ -1,16 +1,29 @@
 import { FormEvent, useState } from "react";
-import type { CopilotResponse } from "../lib/api";
+import type { CopilotResponse, CopilotWebCompareResponse } from "../lib/api";
 
 type CopilotPanelProps = {
   runId: string | null;
   response: CopilotResponse | null;
+  webCompare: CopilotWebCompareResponse | null;
+  webCompareBusy: boolean;
+  webCompareError: string | null;
   isBusy: boolean;
   onAsk: (question: string) => Promise<void>;
   onFocusNode?: (nodeId: string) => void;
   symbolNodeMap?: Map<string, string>;
 };
 
-export function CopilotPanel({ runId, response, isBusy, onAsk, onFocusNode, symbolNodeMap }: CopilotPanelProps): JSX.Element {
+export function CopilotPanel({
+  runId,
+  response,
+  webCompare,
+  webCompareBusy,
+  webCompareError,
+  isBusy,
+  onAsk,
+  onFocusNode,
+  symbolNodeMap
+}: CopilotPanelProps): JSX.Element {
   const [question, setQuestion] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -131,6 +144,52 @@ export function CopilotPanel({ runId, response, isBusy, onAsk, onFocusNode, symb
               </div>
             </div>
           )}
+
+          <div className="copilot-section">
+            <div className="web-compare-card">
+              <div className="web-compare-header">
+                <h3>Web Comparison</h3>
+                <span className="badge subtle">Gemini</span>
+              </div>
+
+              {webCompareBusy && <p className="muted">Searching Reddit and X for similar implementation guidance...</p>}
+
+              {!webCompareBusy && webCompareError && (
+                <p className="muted">Web comparison unavailable: {webCompareError}</p>
+              )}
+
+              {!webCompareBusy && !webCompareError && webCompare && (
+                <>
+                  <p className="web-compare-summary">{webCompare.summary}</p>
+
+                  {webCompare.items.length === 0 && (
+                    <p className="muted">No close public references found for this question yet.</p>
+                  )}
+
+                  {webCompare.items.length > 0 && (
+                    <div className="web-compare-list">
+                      {webCompare.items.map((item, index) => (
+                        <a
+                          key={`${item.url}-${index}`}
+                          className="web-compare-item"
+                          href={item.url}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                        >
+                          <div className="web-compare-item-head">
+                            <span className={`platform-pill ${item.platform}`}>{item.platform.toUpperCase()}</span>
+                            <strong>{item.title}</strong>
+                          </div>
+                          <p>{item.snippet}</p>
+                          {item.why_relevant && <span className="web-compare-why">{item.why_relevant}</span>}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </section>
