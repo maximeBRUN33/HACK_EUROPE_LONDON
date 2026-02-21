@@ -34,13 +34,16 @@ class DustClient:
 
         system_request = (
             "You are Legacy Atlas copilot. Use only provided context and do not invent files or symbols. "
-            "Return strict JSON with keys: answer, citations, risk_implications, related_nodes."
+            "Return strict JSON with keys: answer, citations, risk_implications, related_nodes. "
+            "Each citation must include: file_path (relative path from repo root), symbol (qualified name), "
+            "reason (why this is relevant), line_start (integer or null), line_end (integer or null). "
+            "Always include line numbers when they appear in the context."
         )
         user_prompt = (
             f"Question: {question}\n\n"
             f"Context:\n{json.dumps(context, ensure_ascii=True)}\n\n"
             "JSON format:\n"
-            '{"answer":"...","citations":[{"file_path":"...","symbol":"...","reason":"..."}],'
+            '{"answer":"...","citations":[{"file_path":"...","symbol":"...","reason":"...","line_start":1,"line_end":10}],'
             '"risk_implications":["..."],"related_nodes":["..."]}'
         )
 
@@ -226,11 +229,15 @@ def _normalize_citations(citations: object) -> list[dict]:
 
     for citation in citations:
         if isinstance(citation, dict):
+            line_start = citation.get("line_start")
+            line_end = citation.get("line_end")
             normalized.append(
                 {
                     "file_path": str(citation.get("file_path") or citation.get("file") or "unknown"),
                     "symbol": str(citation.get("symbol") or "unknown"),
                     "reason": str(citation.get("reason") or "Dust citation"),
+                    "line_start": int(line_start) if isinstance(line_start, (int, float)) else None,
+                    "line_end": int(line_end) if isinstance(line_end, (int, float)) else None,
                 }
             )
     return normalized

@@ -20,6 +20,25 @@ from app.store import store
 
 ENTRYPOINT_HINTS = ("confirm", "submit", "process", "assign", "post", "create", "run", "execute")
 
+MIGRATION_SUGGESTIONS: dict[str, list[str]] = {
+    "complexity": [
+        "Refactor into smaller functions with single responsibility",
+        "Extract service layer to isolate business logic",
+    ],
+    "coupling": [
+        "Introduce interface boundary between modules",
+        "Apply dependency injection to decouple components",
+    ],
+    "dead_code": [
+        "Safe to remove after verifying no runtime references",
+        "Archive and monitor for regression",
+    ],
+    "test_gap": [
+        "Add unit tests for critical business logic paths",
+        "Prioritize integration tests for high-risk flows",
+    ],
+}
+
 
 def _entity_from_repo_name(name: str) -> str:
     normalized = name.lower()
@@ -221,6 +240,7 @@ def _build_risk_summary_from_ast(
                     f"{out_degree.get(function.qname, 0)}."
                 ),
                 symbol=function.qname,
+                migration_suggestions=MIGRATION_SUGGESTIONS["complexity"],
             )
         )
 
@@ -239,6 +259,7 @@ def _build_risk_summary_from_ast(
                     f"{out_degree.get(most_coupled.qname, 0)}."
                 ),
                 symbol=most_coupled.qname,
+                migration_suggestions=MIGRATION_SUGGESTIONS["coupling"],
             )
         )
 
@@ -262,6 +283,7 @@ def _build_risk_summary_from_ast(
                 title="Potential dead code path",
                 rationale="No inbound and outbound calls observed in static call graph approximation.",
                 symbol=dead.qname,
+                migration_suggestions=MIGRATION_SUGGESTIONS["dead_code"],
             )
         )
 
@@ -278,6 +300,7 @@ def _build_risk_summary_from_ast(
                 title="Limited test coverage signals",
                 rationale="No test files detected in scanned Python paths while critical logic is complex.",
                 symbol=gap.qname,
+                migration_suggestions=MIGRATION_SUGGESTIONS["test_gap"],
             )
         )
 
@@ -291,6 +314,7 @@ def _build_risk_summary_from_ast(
                 title="Low confidence risk snapshot",
                 rationale="Repository contained too few Python symbols for robust risk scoring.",
                 symbol="n/a",
+                migration_suggestions=MIGRATION_SUGGESTIONS["complexity"],
             )
         ]
 
@@ -389,6 +413,7 @@ def _build_fallback_risk(run: AnalysisRun, repo: Repository) -> RiskSummaryPaylo
             title="Static analysis fallback risk",
             rationale="Local repository path not available, so risk score is estimated from metadata heuristics.",
             symbol=f"{repo.name}.fallback",
+            migration_suggestions=MIGRATION_SUGGESTIONS["complexity"],
         )
     ]
     return RiskSummaryPayload(run_id=run.id, overall_score=findings[0].score, findings=findings)

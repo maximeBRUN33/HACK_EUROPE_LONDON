@@ -20,6 +20,16 @@ export function RiskPanel({ summary }: RiskPanelProps): JSX.Element {
               <li key={finding.id} className={`severity-${finding.severity}`}>
                 <strong>{finding.title}</strong>
                 <p>{finding.rationale}</p>
+                {finding.migration_suggestions && finding.migration_suggestions.length > 0 && (
+                  <ul className="migration-suggestions">
+                    {finding.migration_suggestions.map((suggestion, idx) => (
+                      <li key={idx} className="migration-suggestion-item">
+                        <span className="suggestion-arrow">{"\u2192"}</span>
+                        {suggestion}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <div className="finding-meta">
                   <span>{finding.category}</span>
                   <span>{finding.symbol}</span>

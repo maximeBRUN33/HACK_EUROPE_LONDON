@@ -1,11 +1,13 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CopilotPanel } from "./components/CopilotPanel";
 import { GraphPanel } from "./components/GraphPanel";
 import { RepoIntakePanel } from "./components/RepoIntakePanel";
 import { RiskPanel } from "./components/RiskPanel";
 import {
   askCopilot,
+  fetchDustStatus,
   fetchLineageGraph,
+  fetchMcpStatus,
   fetchNodeEvidence,
   fetchRiskSummary,
   fetchRunStatus,
@@ -48,6 +50,17 @@ export function App(): JSX.Element {
   const [copilotBusy, setCopilotBusy] = useState(false);
   const [workflowEvidenceLoading, setWorkflowEvidenceLoading] = useState(false);
   const [lineageEvidenceLoading, setLineageEvidenceLoading] = useState(false);
+  const [dustConfigured, setDustConfigured] = useState(false);
+  const [codewordsConfigured, setCodewordsConfigured] = useState(false);
+
+  useEffect(() => {
+    fetchDustStatus()
+      .then((res) => setDustConfigured(res.configured))
+      .catch(() => setDustConfigured(false));
+    fetchMcpStatus()
+      .then((res) => setCodewordsConfigured("CodeWords" in (res.servers || {})))
+      .catch(() => setCodewordsConfigured(false));
+  }, []);
 
   async function handleStart(repoUrl: string, commitSha: string, localPath: string): Promise<{ repo: RepoResponse; run: RunResponse }> {
     setBusy(true);
@@ -148,11 +161,17 @@ export function App(): JSX.Element {
       <header>
         <h1>Legacy Atlas</h1>
         <p>AI-powered legacy comprehension with process maps, lineage tracing, and risk intelligence.</p>
-        <div className="run-pill">{runSummary}</div>
+        <div className={`run-pill ${state.run ? `run-pill-${state.run.status}` : ""}`}>{runSummary}</div>
       </header>
 
       <main>
-        <RepoIntakePanel isBusy={busy} onStart={handleStart} />
+        <RepoIntakePanel
+          isBusy={busy}
+          run={state.run}
+          dustConfigured={dustConfigured}
+          codewordsConfigured={codewordsConfigured}
+          onStart={handleStart}
+        />
 
         <section className="grid two-col">
           <GraphPanel

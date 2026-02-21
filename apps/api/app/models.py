@@ -81,6 +81,7 @@ class RiskFinding(BaseModel):
     title: str
     rationale: str
     symbol: str
+    migration_suggestions: list[str] = Field(default_factory=list)
 
 
 class RiskSummaryPayload(BaseModel):
@@ -107,6 +108,8 @@ class CopilotCitation(BaseModel):
     file_path: str
     symbol: str
     reason: str
+    line_start: int | None = None
+    line_end: int | None = None
 
 
 class CopilotResponse(BaseModel):
