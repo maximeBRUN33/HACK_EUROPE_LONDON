@@ -4,7 +4,7 @@
 
 > Built for the [{Tech: Europe} London Hackathon](https://techeurope.io) — Conduct Track
 
-![Legacy Atlas Landing Page](docs/assets/legacy-atlas-landing-overview.svg)
+![Legacy Atlas Landing Page](docs/assets/legacy-atlas-landing-overview.png)
 
 ---
 
