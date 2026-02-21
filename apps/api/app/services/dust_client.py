@@ -47,6 +47,70 @@ class DustClient:
             '"risk_implications":["..."],"related_nodes":["..."]}'
         )
 
+        parsed, raw_text = self._execute_agent_request(system_request, user_prompt)
+
+        answer = str(parsed.get("answer", "")).strip()
+        citations = parsed.get("citations", [])
+        risk_implications = parsed.get("risk_implications", [])
+        related_nodes = parsed.get("related_nodes", [])
+
+        return DustSemanticResponse(
+            answer=answer or "No answer generated",
+            citations=_normalize_citations(citations),
+            risk_implications=[str(item) for item in risk_implications if str(item).strip()],
+            related_nodes=[str(item) for item in related_nodes if str(item).strip()],
+            raw_text=raw_text,
+        )
+
+    def semantic_workflow_enrichment(self, context: dict) -> dict[str, str]:
+        if not self.is_configured():
+            raise RuntimeError("Dust client not configured")
+
+        system_request = (
+            "You are Legacy Atlas workflow mapper. Analyze the provided workflow nodes and edges. "
+            "For each node, provide a concise, business-relevant semantic description. "
+            "Return a JSON object where keys are node IDs and values are strings (descriptions). "
+            "Focus on the 'why' and 'what' of the function, not just technical details."
+        )
+        user_prompt = (
+            f"Context:\n{json.dumps(context, ensure_ascii=True)}\n\n"
+            "JSON format:\n"
+            '{"node-id-1": "Description 1", "node-id-2": "Description 2"}'
+        )
+
+        parsed, _ = self._execute_agent_request(system_request, user_prompt)
+
+        # Ensure values are strings
+        return {str(k): str(v) for k, v in parsed.items()}
+
+    def semantic_risk_assessment(self, context: dict) -> dict[str, dict[str, str]]:
+        if not self.is_configured():
+            raise RuntimeError("Dust client not configured")
+
+        system_request = (
+            "You are Legacy Atlas risk analyst. Analyze the provided risk findings. "
+            "For each finding, provide an improved title and rationale based on the context. "
+            "Return a JSON object where keys are finding IDs and values are objects with 'title' and 'rationale' fields."
+        )
+        user_prompt = (
+            f"Context:\n{json.dumps(context, ensure_ascii=True)}\n\n"
+            "JSON format:\n"
+            '{"finding-id-1": {"title": "...", "rationale": "..."}, ...}'
+        )
+
+        parsed, _ = self._execute_agent_request(system_request, user_prompt)
+
+        # Ensure structure is correct
+        result: dict[str, dict[str, str]] = {}
+        for k, v in parsed.items():
+            if isinstance(v, dict):
+                result[str(k)] = {
+                    "title": str(v.get("title", "")),
+                    "rationale": str(v.get("rationale", ""))
+                }
+        return result
+
+    def _execute_agent_request(self, system_request: str, user_prompt: str) -> tuple[dict, str]:
         creation = self._create_conversation(system_request, user_prompt)
 
         conversation_id = _first_non_empty(
@@ -70,18 +134,7 @@ class DustClient:
         if not parsed:
             raise RuntimeError("Dust did not return valid JSON response")
 
-        answer = str(parsed.get("answer", "")).strip()
-        citations = parsed.get("citations", [])
-        risk_implications = parsed.get("risk_implications", [])
-        related_nodes = parsed.get("related_nodes", [])
-
-        return DustSemanticResponse(
-            answer=answer or "No answer generated",
-            citations=_normalize_citations(citations),
-            risk_implications=[str(item) for item in risk_implications if str(item).strip()],
-            related_nodes=[str(item) for item in related_nodes if str(item).strip()],
-            raw_text=raw_text,
-        )
+        return parsed, raw_text
 
     def _create_conversation(self, system_request: str, user_prompt: str) -> dict:
         url = f"{self.base_url}/w/{self.workspace_id}/assistant/conversations"
