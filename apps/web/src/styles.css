@@ -144,7 +144,6 @@ header p {
 }
 
 main {
-  margin-top: 16px;
   display: grid;
   gap: 16px;
 }
@@ -155,6 +154,14 @@ main {
   border-radius: 16px;
   padding: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.tab-content-card .card {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
 }
 
 .card-title-row {
@@ -599,12 +606,35 @@ button:disabled {
   }
 }
 
+/* Tab navigation card */
+.tab-nav-card {
+  margin-top: 16px;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 16px 24px;
+  animation: fade-in-up 300ms ease 140ms both;
+}
+
 /* Tab description */
 .tab-description {
   text-align: center;
   font-size: 14px;
   color: var(--ink-mid);
-  margin: 8px 0 0;
+  margin: 10px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid #E5E7EB;
+}
+
+/* Tab content card */
+.tab-content-card {
+  margin-top: 16px;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 24px;
+  display: grid;
+  gap: 16px;
 }
 
 .header-compact {
@@ -615,16 +645,11 @@ button:disabled {
   animation: fade-in-up 300ms ease 80ms both;
 }
 
-.tab-bar {
-  animation: fade-in-up 300ms ease 140ms both;
-}
-
 /* Tab navigation bar */
 .tab-bar {
   display: flex;
   justify-content: center;
   gap: 32px;
-  margin-top: 12px;
   border-bottom: 1px solid #E5E7EB;
   padding: 0;
 }
@@ -1641,9 +1666,9 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 0;
-  margin-top: 12px;
+  margin-top: 16px;
   padding: 14px 20px;
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid #E5E7EB;
   background: #FFFFFF;
 }

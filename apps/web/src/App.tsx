@@ -260,20 +260,22 @@ export function App(): JSX.Element {
         </div>
       </div>
 
-      <nav className="tab-bar">
-        <button className={`tab-btn ${activeTab === "process" ? "active" : ""}`} onClick={() => setActiveTab("process")}>Process Explorer</button>
-        <button className={`tab-btn ${activeTab === "data" ? "active" : ""}`} onClick={() => setActiveTab("data")}>Data Lineage</button>
-        <button className={`tab-btn ${activeTab === "risk" ? "active" : ""}`} onClick={() => setActiveTab("risk")}>Risk Analysis</button>
-        <button className={`tab-btn ${activeTab === "copilot" ? "active" : ""}`} onClick={() => setActiveTab("copilot")}>Copilot</button>
-      </nav>
-      <p className="tab-description">
-        {activeTab === "process" && "How your codebase\u2019s business workflows connect and flow"}
-        {activeTab === "data" && "How data entities move across modules in your system"}
-        {activeTab === "risk" && "Where complexity and technical debt create migration risk"}
-        {activeTab === "copilot" && "Ask questions about the codebase and get cited answers"}
-      </p>
+      <div className="tab-nav-card">
+        <nav className="tab-bar">
+          <button className={`tab-btn ${activeTab === "process" ? "active" : ""}`} onClick={() => setActiveTab("process")}>Process Explorer</button>
+          <button className={`tab-btn ${activeTab === "data" ? "active" : ""}`} onClick={() => setActiveTab("data")}>Data Lineage</button>
+          <button className={`tab-btn ${activeTab === "risk" ? "active" : ""}`} onClick={() => setActiveTab("risk")}>Risk Analysis</button>
+          <button className={`tab-btn ${activeTab === "copilot" ? "active" : ""}`} onClick={() => setActiveTab("copilot")}>Copilot</button>
+        </nav>
+        <p className="tab-description">
+          {activeTab === "process" && "How your codebase\u2019s business workflows connect and flow"}
+          {activeTab === "data" && "How data entities move across modules in your system"}
+          {activeTab === "risk" && "Where complexity and technical debt create migration risk"}
+          {activeTab === "copilot" && "Ask questions about the codebase and get cited answers"}
+        </p>
+      </div>
 
-      <main>
+      <main className="tab-content-card">
         {activeTab === "process" && (
           <GraphPanel
             title="Process Atlas"
