@@ -1169,6 +1169,244 @@ button:disabled {
   margin-bottom: 10px;
 }
 
+/* ── Risk Dashboard ── */
+.risk-overview-card {
+  text-align: center;
+}
+
+.risk-score-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 0 16px;
+}
+
+.risk-score-number {
+  font-size: 3.2rem;
+  font-weight: 800;
+  font-family: "Space Grotesk", sans-serif;
+  line-height: 1;
+}
+
+.risk-score-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.risk-score-summary {
+  font-size: 0.84rem;
+  color: var(--ink-low);
+  margin-top: 4px;
+}
+
+.risk-category-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.risk-category-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border-radius: 10px;
+  border: 1px solid #E5E7EB;
+  background: #F9FAFB;
+}
+
+.risk-cat-active {
+  background: #FFFFFF;
+  border-color: #D1D5DB;
+}
+
+.risk-cat-empty {
+  opacity: 0.5;
+}
+
+.risk-cat-icon {
+  font-size: 1.1rem;
+}
+
+.risk-cat-count {
+  font-size: 1.3rem;
+  font-weight: 700;
+  font-family: "Space Grotesk", sans-serif;
+  color: var(--ink-high);
+}
+
+.risk-cat-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-low);
+  font-weight: 600;
+}
+
+.risk-findings-card {
+  margin-top: 0;
+}
+
+.risk-findings-list {
+  display: grid;
+  gap: 8px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.risk-finding-card {
+  display: flex;
+  border-radius: 10px;
+  border: 1px solid #E5E7EB;
+  background: #FFFFFF;
+  overflow: hidden;
+  transition: box-shadow 120ms ease;
+}
+
+.risk-finding-card.expandable {
+  cursor: pointer;
+}
+
+.risk-finding-card.expandable:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.risk-finding-bar {
+  width: 4px;
+  flex-shrink: 0;
+}
+
+.risk-finding-body {
+  flex: 1;
+  padding: 10px 14px;
+  display: grid;
+  gap: 4px;
+}
+
+.risk-finding-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.risk-finding-badges {
+  display: flex;
+  gap: 6px;
+}
+
+.sev-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+}
+
+.sev-badge-critical {
+  background: #FEF2F2;
+  color: #EF4444;
+}
+
+.sev-badge-high {
+  background: #FFFBEB;
+  color: #D97706;
+}
+
+.sev-badge-medium {
+  background: #FFFBEB;
+  color: #F59E0B;
+}
+
+.sev-badge-low {
+  background: #F0FDF4;
+  color: #22C55E;
+}
+
+.cat-badge {
+  font-size: 0.68rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #F3F4F6;
+  color: var(--ink-mid);
+  text-transform: capitalize;
+}
+
+.risk-finding-score {
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.risk-finding-title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--ink-high);
+}
+
+.risk-finding-rationale {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ink-mid);
+  line-height: 1.4;
+}
+
+.risk-finding-affected {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.risk-finding-node {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #EFF6FF;
+  color: #1E40AF;
+}
+
+.risk-finding-symbol {
+  font-size: 0.74rem;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: #F3F4F6;
+  color: var(--ink-mid);
+}
+
+.risk-finding-expand-hint {
+  font-size: 0.74rem;
+  color: var(--ink-low);
+  margin-top: 2px;
+}
+
+.risk-finding-suggestions {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+  display: grid;
+  gap: 4px;
+}
+
+.risk-finding-suggestions li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--ink-mid);
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #F0FDF4;
+  border: 1px solid rgba(34, 197, 94, 0.15);
+}
+
 .severity-high {
   border-color: #F59E0B !important;
 }

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { EnrichmentPayload, MigrationBlueprintPayload, RiskSummary } from "../lib/api";
+import { humanizeLabel } from "./GraphCanvas";
 
 type RiskPanelProps = {
   summary: RiskSummary | null;
@@ -8,9 +9,28 @@ type RiskPanelProps = {
   blueprintLoading?: boolean;
 };
 
-const SEVERITY_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 const SEVERITY_FILTERS = ["all", "critical", "high", "medium", "low"] as const;
 type SeverityFilter = (typeof SEVERITY_FILTERS)[number];
+
+const SEVERITY_COLORS: Record<string, string> = {
+  critical: "#EF4444",
+  high: "#F59E0B",
+  medium: "#FBBF24",
+  low: "#22C55E",
+};
+
+const CATEGORY_ICONS: Record<string, string> = {
+  complexity: "\u2699",   // gear
+  coupling: "\u26D3",     // chain
+  dead_code: "\u2620",    // skull
+  test_gap: "\u26A0",     // warning
+};
+
+function scoreColor(score: number): string {
+  if (score > 60) return "#EF4444";
+  if (score >= 40) return "#F59E0B";
+  return "#22C55E";
+}
 
 function readinessBandColor(band: string): string {
   const lower = band.toLowerCase();
@@ -21,16 +41,39 @@ function readinessBandColor(band: string): string {
 
 export function RiskPanel({ summary, enrichment, migrationBlueprint, blueprintLoading }: RiskPanelProps): JSX.Element {
   const [filter, setFilter] = useState<SeverityFilter>("all");
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const sortedFindings = useMemo(() => {
     if (!summary) return [];
-    const sorted = [...summary.findings].sort(
-      (a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9)
-    );
+    const sorted = [...summary.findings].sort((a, b) => b.score - a.score);
     if (filter === "all") return sorted;
     return sorted.filter((f) => f.severity === filter);
   }, [summary, filter]);
 
+  const categoryCounts = useMemo(() => {
+    if (!summary) return { complexity: 0, coupling: 0, dead_code: 0, test_gap: 0 };
+    const counts: Record<string, number> = { complexity: 0, coupling: 0, dead_code: 0, test_gap: 0 };
+    for (const f of summary.findings) {
+      if (f.category in counts) counts[f.category]++;
+    }
+    return counts;
+  }, [summary]);
+
+  const uniqueCategories = useMemo(() => {
+    if (!summary) return 0;
+    return new Set(summary.findings.map((f) => f.category)).size;
+  }, [summary]);
+
+  function toggleExpand(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  // ── Enrichment memos (kept from original) ──
   const migrationHints = useMemo(() => {
     if (!enrichment?.migration_hints) return [];
     const hints = enrichment.migration_hints;
@@ -71,6 +114,7 @@ export function RiskPanel({ summary, enrichment, migrationBlueprint, blueprintLo
   const enrichmentUnavailable = !enrichment || enrichmentStatus === "not_configured" || enrichmentStatus === "failed" || enrichmentStatus === "error";
   const enrichmentRunning = enrichmentStatus === "queued" || enrichmentStatus === "running";
 
+  // ── Blueprint memos ──
   const extractionBoundaries = useMemo(() => {
     if (!migrationBlueprint?.extraction_boundaries) return [];
     return migrationBlueprint.extraction_boundaries.map((b) => {
@@ -101,6 +145,107 @@ export function RiskPanel({ summary, enrichment, migrationBlueprint, blueprintLo
 
   return (
     <>
+      {/* ── Overall Risk Summary ── */}
+      <section className="card risk-overview-card">
+        {!summary && <p className="muted">Risk findings appear after a run completes.</p>}
+        {summary && (
+          <>
+            <div className="risk-score-hero">
+              <span className="risk-score-number" style={{ color: scoreColor(summary.overall_score) }}>
+                {Math.round(summary.overall_score)}
+              </span>
+              <span className="risk-score-label">Overall Risk Score</span>
+              <span className="risk-score-summary">
+                {summary.findings.length} finding{summary.findings.length !== 1 ? "s" : ""} across {uniqueCategories} risk categor{uniqueCategories !== 1 ? "ies" : "y"}
+              </span>
+            </div>
+
+            {/* ── Category Summary Cards ── */}
+            <div className="risk-category-row">
+              {(["complexity", "coupling", "dead_code", "test_gap"] as const).map((cat) => (
+                <div key={cat} className={`risk-category-card ${categoryCounts[cat] > 0 ? "risk-cat-active" : "risk-cat-empty"}`}>
+                  <span className="risk-cat-icon">{CATEGORY_ICONS[cat]}</span>
+                  <span className="risk-cat-count">{categoryCounts[cat]}</span>
+                  <span className="risk-cat-label">{cat.replace("_", " ")}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+
+      {/* ── Risk Findings List ── */}
+      {summary && summary.findings.length > 0 && (
+        <section className="card risk-findings-card">
+          <div className="card-title-row">
+            <h2>Risk Findings</h2>
+            <span className="badge subtle">{sortedFindings.length} shown</span>
+          </div>
+
+          <div className="risk-filters">
+            {SEVERITY_FILTERS.map((sev) => (
+              <button
+                key={sev}
+                className={`risk-filter-btn ${filter === sev ? "active" : ""} ${sev !== "all" ? `sev-${sev}` : ""}`}
+                onClick={() => setFilter(sev)}
+              >
+                {sev === "all" ? `All (${summary.findings.length})` : `${sev} (${summary.findings.filter((f) => f.severity === sev).length})`}
+              </button>
+            ))}
+          </div>
+
+          <div className="risk-findings-list">
+            {sortedFindings.map((finding) => {
+              const isExpanded = expandedIds.has(finding.id);
+              const hasSuggestions = finding.migration_suggestions && finding.migration_suggestions.length > 0;
+              const readableName = humanizeLabel(finding.symbol);
+              return (
+                <div
+                  key={finding.id}
+                  className={`risk-finding-card ${hasSuggestions ? "expandable" : ""}`}
+                  onClick={() => hasSuggestions && toggleExpand(finding.id)}
+                  role={hasSuggestions ? "button" : undefined}
+                  tabIndex={hasSuggestions ? 0 : undefined}
+                  onKeyDown={(e) => { if (hasSuggestions && e.key === "Enter") toggleExpand(finding.id); }}
+                >
+                  <div className="risk-finding-bar" style={{ background: SEVERITY_COLORS[finding.severity] ?? "#9CA3AF" }} />
+                  <div className="risk-finding-body">
+                    <div className="risk-finding-header">
+                      <div className="risk-finding-badges">
+                        <span className={`sev-badge sev-badge-${finding.severity}`}>{finding.severity.toUpperCase()}</span>
+                        <span className="cat-badge">{finding.category.replace("_", " ")}</span>
+                      </div>
+                      <span className="risk-finding-score" style={{ color: scoreColor(finding.score) }}>{Math.round(finding.score)}</span>
+                    </div>
+                    <p className="risk-finding-title">{finding.title}</p>
+                    <p className="risk-finding-rationale">{finding.rationale}</p>
+                    <div className="risk-finding-affected">
+                      <span className="risk-finding-node">{readableName}</span>
+                      <code className="risk-finding-symbol">{finding.symbol}</code>
+                    </div>
+                    {hasSuggestions && (
+                      <span className="risk-finding-expand-hint">
+                        {isExpanded ? "\u25BC Hide suggestions" : `\u25B6 ${finding.migration_suggestions.length} migration suggestion${finding.migration_suggestions.length !== 1 ? "s" : ""}`}
+                      </span>
+                    )}
+                    {isExpanded && finding.migration_suggestions.length > 0 && (
+                      <ul className="risk-finding-suggestions">
+                        {finding.migration_suggestions.map((sug, idx) => (
+                          <li key={idx}>
+                            <span className="suggestion-arrow">{"\u2192"}</span>
+                            {sug}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {/* ── AI Enrichment section ── */}
       <section className="card enrichment-card">
         <div className="card-title-row">
@@ -173,56 +318,6 @@ export function RiskPanel({ summary, enrichment, migrationBlueprint, blueprintLo
         )}
       </section>
 
-      {/* ── Risk Observatory ── */}
-      <section className="card risk-card">
-        <div className="card-title-row">
-          <h2>Risk Observatory</h2>
-          <span className="badge high">Critical Insight</span>
-        </div>
-        {!summary && <p className="muted">Risk findings appear after a run completes.</p>}
-        {summary && (
-          <>
-            <p className="score">Overall Score: {summary.overall_score}</p>
-
-            <div className="risk-filters">
-              {SEVERITY_FILTERS.map((sev) => (
-                <button
-                  key={sev}
-                  className={`risk-filter-btn ${filter === sev ? "active" : ""} ${sev !== "all" ? `sev-${sev}` : ""}`}
-                  onClick={() => setFilter(sev)}
-                >
-                  {sev === "all" ? `All (${summary.findings.length})` : `${sev} (${summary.findings.filter((f) => f.severity === sev).length})`}
-                </button>
-              ))}
-            </div>
-
-            <ul className="finding-list">
-              {sortedFindings.map((finding) => (
-                <li key={finding.id} className={`severity-${finding.severity}`}>
-                  <strong>{finding.title}</strong>
-                  <p>{finding.rationale}</p>
-                  {finding.migration_suggestions && finding.migration_suggestions.length > 0 && (
-                    <ul className="migration-suggestions">
-                      {finding.migration_suggestions.map((suggestion, idx) => (
-                        <li key={idx} className="migration-suggestion-item">
-                          <span className="suggestion-arrow">{"\u2192"}</span>
-                          {suggestion}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <div className="finding-meta">
-                    <span>{finding.category}</span>
-                    <span>{finding.symbol}</span>
-                    <span>{finding.severity}</span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </section>
-
       {/* ── Migration Blueprint ── */}
       {blueprintLoading && (
         <section className="card blueprint-card">
@@ -238,10 +333,7 @@ export function RiskPanel({ summary, enrichment, migrationBlueprint, blueprintLo
         <section className="card blueprint-card">
           <div className="card-title-row">
             <h2>Migration Blueprint</h2>
-            <span
-              className="badge"
-              style={{ background: readinessBandColor(migrationBlueprint.readiness_band) }}
-            >
+            <span className="badge" style={{ background: readinessBandColor(migrationBlueprint.readiness_band) }}>
               {migrationBlueprint.readiness_band} Readiness
             </span>
           </div>

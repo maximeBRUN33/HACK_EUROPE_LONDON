@@ -364,20 +364,7 @@ export function App(): JSX.Element {
         )}
 
         {activeTab === "risk" && (
-          <>
-            <GraphPanel
-              title="Risk Atlas"
-              graph={state.workflowGraph}
-              evidence={state.workflowEvidence}
-              evidenceLoading={workflowEvidenceLoading}
-              onSelectNode={handleSelectWorkflowNode}
-              riskOverlay
-              focusedNodeId={focusedNodeId}
-              riskSummary={state.riskSummary}
-              graphMode="process"
-            />
-            <RiskPanel summary={state.riskSummary} enrichment={state.enrichment} migrationBlueprint={migrationBlueprint} blueprintLoading={blueprintLoading} />
-          </>
+          <RiskPanel summary={state.riskSummary} enrichment={state.enrichment} migrationBlueprint={migrationBlueprint} blueprintLoading={blueprintLoading} />
         )}
 
         {activeTab === "copilot" && (
