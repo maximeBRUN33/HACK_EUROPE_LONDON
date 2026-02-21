@@ -4,6 +4,8 @@
 
 > Built for the [{Tech: Europe} London Hackathon](https://techeurope.io) — Conduct Track
 
+![Legacy Atlas Landing Page](docs/assets/legacy-atlas-landing-overview.svg)
+
 ---
 
 ## The Problem
@@ -34,19 +36,35 @@ GitHub repo → Clone locally → Parse Python AST → Build workflow/lineage/ri
 
 | Partner | Role |
 |---|---|
-| **Gemini (Google DeepMind)** | AI reasoning backbone for code understanding and semantic labeling |
-| **Dust** | Multi-agent orchestration for copilot Q&A with RAG-grounded citations |
-| **CodeWords** | Pipeline automation — triggers scans, orchestrates analysis workflows |
-| **Lovable** | Rapid UI generation and design acceleration |
+| **CodeWords** | Post-analysis runtime workflow for semantic enrichment and migration hints |
+| **Dust** | Primary semantic copilot engine for grounded answers and citations |
+| **Gemini (Google DeepMind)** | External web comparison add-on for Reddit/X references |
+
+### How Each Integration Is Used
+
+- **CodeWords**
+  - Runs automatically after static analysis in backend job flow.
+  - Adds semantic enrichment (ontology + migration hints + quality checks) to each run.
+  - Powers the AI Enrichment section and improves migration-oriented context.
+- **Dust**
+  - Main semantic engine for Developer Copilot answers.
+  - Receives run context (workflow graph, risk findings, evidence, enrichment) and returns grounded answer + citations + implications.
+  - If unavailable, backend falls back to deterministic local copilot logic.
+- **Gemini**
+  - Secondary add-on after copilot answer (`/api/copilot/web-compare` endpoint).
+  - Finds external discussions (Reddit/X) similar to the copilot recommendation.
+  - Displayed in a separate “Web Comparison” card with links and short rationale, complementing internal analysis.
 
 ## Architecture
+
+![Legacy Atlas Architecture](docs/assets/legacy-atlas-architecture-overview.svg)
 
 | Layer | Stack | Port |
 |---|---|---|
 | Backend | FastAPI + Python 3.12 | 8000 |
 | Frontend | React 18 + TypeScript + Vite | 5173 |
 | Storage | SQLite | — |
-| AI | Dust (semantic copilot), CodeWords (orchestration) | External |
+| AI | Dust (semantic copilot), CodeWords (enrichment), Gemini (web comparison) | External |
 
 ### Analysis Pipeline
 Register repo → Start scan → Ingest source → Parse Python AST → Build graphs → Score risks → Persist artifacts → Complete
@@ -180,7 +198,7 @@ pip install -e .[dev]
 pytest
 ```
 
-19 tests covering health check, end-to-end scan + graph generation, migration blueprint endpoint, manual API flow parity, Dust fallback matrix, copilot paths, ingestion branch resolution, API error detail codes, MCP/Dust status, integrations readiness, and fallback mode.
+22 tests covering health check, end-to-end scan + graph generation, migration blueprint endpoint, manual API flow parity, Dust fallback matrix, copilot paths, ingestion branch resolution, API error detail codes, MCP/Dust status, integrations readiness, and fallback mode.
 
 ## Repository Structure
 ```

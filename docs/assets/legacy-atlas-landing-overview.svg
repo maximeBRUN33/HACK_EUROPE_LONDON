@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.2" fill="#DADADA" />
+    </pattern>
+  </defs>
+  <rect width="1600" height="900" fill="#FAFAFA" />
+  <rect width="1600" height="900" fill="url(#dots)" opacity="0.85" />
+
+  <text x="800" y="150" text-anchor="middle" font-family="Space Grotesk, Arial, sans-serif" font-size="84" font-weight="700" fill="#1A1A2E">Meet Legacy Atlas</text>
+  <text x="800" y="225" text-anchor="middle" font-family="IBM Plex Sans, Arial, sans-serif" font-size="52" fill="#6B7280">AI-powered legacy code comprehension.</text>
+
+  <rect x="250" y="290" width="1100" height="320" rx="28" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="2"/>
+  <rect x="310" y="350" width="980" height="82" rx="20" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="2"/>
+  <text x="340" y="404" font-family="IBM Plex Sans, Arial, sans-serif" font-size="44" fill="#1A1A2E">https://github.com/example/legacy-repo.git</text>
+
+  <text x="310" y="500" font-family="IBM Plex Sans, Arial, sans-serif" font-size="42" fill="#9CA3AF">Advanced options</text>
+
+  <rect x="310" y="520" width="980" height="84" rx="24" fill="#1A1A2E"/>
+  <text x="800" y="575" text-anchor="middle" font-family="IBM Plex Sans, Arial, sans-serif" font-size="50" font-weight="700" fill="#FFFFFF">Analyze Repository →</text>
+
+  <text x="800" y="690" text-anchor="middle" font-family="IBM Plex Sans, Arial, sans-serif" font-size="42" fill="#6B7280">Built for teams managing legacy codebases</text>
+  <text x="800" y="760" text-anchor="middle" font-family="IBM Plex Sans, Arial, sans-serif" font-size="34" font-weight="700" letter-spacing="4" fill="#D1D5DB">SAP • ORACLE • ERPNEXT • ODOO • DJANGO • PYTHON</text>
+  <text x="800" y="832" text-anchor="middle" font-family="IBM Plex Sans, Arial, sans-serif" font-size="32" fill="#9CA3AF">Powered by Gemini • Dust • CodeWords</text>
+</svg>

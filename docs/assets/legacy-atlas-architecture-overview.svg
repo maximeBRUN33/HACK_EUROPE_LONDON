@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980">
+  <rect width="1600" height="980" fill="#FAFAFA"/>
+
+  <text x="800" y="54" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="30" fill="#1A1A2E">Legacy Atlas - High-Level Architecture</text>
+
+  <rect x="70" y="90" width="1460" height="120" fill="#EFF6FF" stroke="#93C5FD" stroke-width="2"/>
+  <text x="800" y="126" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="24" fill="#1E40AF">USER INTERFACE</text>
+  <rect x="170" y="140" width="380" height="52" fill="#FFFFFF" stroke="#2563EB" stroke-width="2"/>
+  <text x="360" y="173" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="24" fill="#1A1A2E">React Frontend</text>
+  <rect x="980" y="140" width="380" height="52" fill="#FFFFFF" stroke="#2563EB" stroke-width="2"/>
+  <text x="1170" y="173" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="24" fill="#1A1A2E">Developer Copilot UI</text>
+
+  <rect x="300" y="250" width="1000" height="130" fill="#1E293B" stroke="#2563EB" stroke-width="2"/>
+  <text x="800" y="292" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="26" fill="#93C5FD">LEGACY ATLAS BACKEND API</text>
+  <rect x="560" y="314" width="480" height="48" fill="#0B1220" stroke="#2563EB" stroke-width="2"/>
+  <text x="800" y="345" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="22" fill="#FFFFFF">Orchestration Layer</text>
+
+  <rect x="100" y="440" width="620" height="390" fill="#EFF6FF" stroke="#93C5FD" stroke-width="2"/>
+  <text x="410" y="474" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="24" fill="#1E40AF">SEMANTIC COPILOT</text>
+  <rect x="220" y="520" width="380" height="60" fill="#0F172A" stroke="#2563EB" stroke-width="2"/>
+  <text x="410" y="558" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="24" fill="#93C5FD">Dust Copilot</text>
+  <rect x="200" y="640" width="420" height="58" fill="#FFFFFF" stroke="#2563EB" stroke-width="2"/>
+  <text x="410" y="676" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="22" fill="#1A1A2E">Grounded Answer + Citations</text>
+  <rect x="280" y="740" width="260" height="52" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="2"/>
+  <text x="410" y="773" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="20" fill="#374151">Gemini Web Compare</text>
+
+  <rect x="820" y="440" width="680" height="390" fill="#F3F4F6" stroke="#D1D5DB" stroke-width="2"/>
+  <text x="1160" y="474" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="24" fill="#374151">INGESTION PIPELINE</text>
+  <rect x="940" y="520" width="440" height="60" fill="#FFFFFF" stroke="#2563EB" stroke-width="2"/>
+  <text x="1160" y="558" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="22" fill="#1A1A2E">Repo Ingestion + Static Analysis</text>
+  <rect x="940" y="640" width="260" height="58" fill="#FFFFFF" stroke="#F59E0B" stroke-width="2"/>
+  <text x="1070" y="676" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="20" fill="#92400E">CodeWords Enrichment</text>
+  <rect x="1220" y="640" width="220" height="58" fill="#FFFFFF" stroke="#22C55E" stroke-width="2"/>
+  <text x="1330" y="676" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="20" fill="#166534">Core Artifacts</text>
+
+  <rect x="120" y="870" width="1360" height="80" fill="#F0FDF4" stroke="#22C55E" stroke-width="2"/>
+  <text x="800" y="904" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="24" fill="#15803D">OUTPUT LAYER: Process Explorer • Data Lineage • Risk Panels • Copilot + Web Comparison</text>
+
+  <path d="M 360 194 C 360 230, 520 240, 620 314" fill="none" stroke="#6B7280" stroke-width="2"/>
+  <path d="M 1170 194 C 1170 230, 1050 250, 980 314" fill="none" stroke="#6B7280" stroke-width="2"/>
+  <path d="M 800 362 C 650 400, 520 450, 410 520" fill="none" stroke="#6B7280" stroke-width="2" stroke-dasharray="6 6"/>
+  <path d="M 920 362 C 1050 400, 1120 450, 1160 520" fill="none" stroke="#6B7280" stroke-width="2"/>
+  <path d="M 410 580 L 410 640" fill="none" stroke="#9CA3AF" stroke-width="2"/>
+  <path d="M 410 698 L 410 740" fill="none" stroke="#9CA3AF" stroke-width="2"/>
+  <path d="M 1160 580 L 1070 640" fill="none" stroke="#9CA3AF" stroke-width="2"/>
+  <path d="M 1160 580 L 1330 640" fill="none" stroke="#9CA3AF" stroke-width="2"/>
+  <path d="M 410 792 C 410 835, 620 860, 700 870" fill="none" stroke="#6B7280" stroke-width="2"/>
+  <path d="M 1070 698 C 1070 835, 920 860, 860 870" fill="none" stroke="#6B7280" stroke-width="2"/>
+  <path d="M 1330 698 C 1330 835, 980 860, 920 870" fill="none" stroke="#6B7280" stroke-width="2"/>
+</svg>
