@@ -46,6 +46,7 @@ export type RiskFinding = {
   title: string;
   rationale: string;
   symbol: string;
+  migration_suggestions: string[];
 };
 
 export type RiskSummary = {
@@ -58,6 +59,8 @@ export type CopilotCitation = {
   file_path: string;
   symbol: string;
   reason: string;
+  line_start?: number | null;
+  line_end?: number | null;
 };
 
 export type CopilotResponse = {
@@ -135,6 +138,14 @@ export async function askCopilot(runId: string, question: string): Promise<Copil
     throw new Error(`Copilot query failed (${response.status})`);
   }
   return response.json();
+}
+
+export async function fetchDustStatus(): Promise<{ configured: boolean }> {
+  return fetchJson<{ configured: boolean }>(`${API_BASE}/api/integrations/dust/status`);
+}
+
+export async function fetchMcpStatus(): Promise<{ servers: Record<string, unknown> }> {
+  return fetchJson<{ servers: Record<string, unknown> }>(`${API_BASE}/api/integrations/mcp/status`);
 }
 
 async function fetchJson<T>(url: string): Promise<T> {

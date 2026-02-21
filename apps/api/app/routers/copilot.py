@@ -38,6 +38,19 @@ def query_copilot(payload: CopilotRequest) -> CopilotResponse:
         "focus_evidence": focus_evidence.model_dump() if focus_evidence else None,
     }
 
+    node_evidence_map = []
+    for node in graph.nodes[:12]:
+        ev = store.get_evidence(str(payload.run_id), node.id)
+        if ev:
+            node_evidence_map.append({
+                "node_id": node.id,
+                "label": node.label,
+                "files": ev.files,
+                "symbols": ev.symbols,
+                "explanation": ev.explanation,
+            })
+    context["node_evidence"] = node_evidence_map
+
     dust = DustClient()
     if dust.is_configured():
         try:
@@ -47,6 +60,8 @@ def query_copilot(payload: CopilotRequest) -> CopilotResponse:
                     file_path=item["file_path"],
                     symbol=item["symbol"],
                     reason=item["reason"],
+                    line_start=item.get("line_start"),
+                    line_end=item.get("line_end"),
                 )
                 for item in semantic.citations
             ]

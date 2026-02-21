@@ -448,6 +448,208 @@ button:disabled {
   color: var(--ink-mid);
 }
 
+/* Citation line numbers */
+.citation-lines {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.78rem;
+  color: var(--accent-mint);
+  background: rgba(116, 226, 177, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+
+/* Copilot risk implications */
+.implication-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.implication-item {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 138, 111, 0.3);
+  background: rgba(42, 18, 17, 0.4);
+  color: var(--accent-coral);
+  font-size: 0.88rem;
+}
+
+.related-nodes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* Pipeline progress tracker */
+.pipeline-tracker {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(61, 111, 142, 0.3);
+}
+
+.pipeline-steps {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.pipeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.pipeline-step-indicator {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  border: 2px solid rgba(72, 107, 126, 0.46);
+  background: rgba(7, 24, 34, 0.6);
+  color: var(--ink-low);
+  transition: all 200ms ease;
+}
+
+.pipeline-step-pending .pipeline-step-indicator {
+  border-color: rgba(72, 107, 126, 0.46);
+  color: var(--ink-low);
+}
+
+.pipeline-step-active .pipeline-step-indicator {
+  border-color: var(--accent-cyan);
+  background: rgba(55, 213, 214, 0.15);
+  color: var(--accent-cyan);
+  box-shadow: 0 0 12px rgba(55, 213, 214, 0.3);
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
+.pipeline-step-completed .pipeline-step-indicator {
+  border-color: var(--accent-mint);
+  background: rgba(116, 226, 177, 0.18);
+  color: var(--accent-mint);
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(55, 213, 214, 0.2); }
+  50% { box-shadow: 0 0 16px rgba(55, 213, 214, 0.45); }
+}
+
+.pipeline-step-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-low);
+  text-align: center;
+}
+
+.pipeline-step-active .pipeline-step-label {
+  color: var(--accent-cyan);
+  font-weight: 600;
+}
+
+.pipeline-step-completed .pipeline-step-label {
+  color: var(--accent-mint);
+}
+
+.pipeline-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(72, 107, 126, 0.3);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.pipeline-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-mint));
+  transition: width 400ms ease;
+}
+
+.integration-badges {
+  display: flex;
+  gap: 8px;
+}
+
+.integration-badge {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.7rem;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(72, 107, 126, 0.46);
+}
+
+.integration-badge.configured {
+  background: rgba(116, 226, 177, 0.12);
+  color: var(--accent-mint);
+  border-color: rgba(116, 226, 177, 0.35);
+}
+
+.integration-badge.not-configured {
+  background: rgba(255, 95, 92, 0.1);
+  color: var(--ink-low);
+  border-color: rgba(127, 154, 176, 0.3);
+}
+
+/* Run pill status colors */
+.run-pill-running {
+  border-color: rgba(55, 213, 214, 0.65);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.run-pill-completed {
+  border-color: rgba(116, 226, 177, 0.6);
+  color: var(--accent-mint);
+}
+
+.run-pill-failed {
+  border-color: rgba(255, 95, 92, 0.6);
+  color: var(--accent-coral);
+}
+
+.run-pill-queued {
+  border-color: rgba(255, 194, 71, 0.5);
+  color: var(--accent-amber);
+}
+
+/* Migration suggestions */
+.migration-suggestions {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0 8px;
+  display: grid;
+  gap: 4px;
+}
+
+.migration-suggestion-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(55, 213, 214, 0.06);
+  border: 1px solid rgba(55, 213, 214, 0.18);
+  font-size: 0.84rem;
+  color: var(--accent-cyan);
+}
+
+.suggestion-arrow {
+  color: var(--accent-mint);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
 @media (max-width: 1080px) {
   .grid.two-col {
     grid-template-columns: 1fr;

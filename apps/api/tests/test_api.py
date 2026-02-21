@@ -94,6 +94,10 @@ def test_end_to_end_scan_and_graphs(tmp_path: Path) -> None:
     assert len(workflow_response.json()["nodes"]) > 0
     assert len(lineage_response.json()["edges"]) > 0
     assert len(risk_response.json()["findings"]) > 0
+    for finding in risk_response.json()["findings"]:
+        assert "migration_suggestions" in finding
+        assert isinstance(finding["migration_suggestions"], list)
+        assert len(finding["migration_suggestions"]) > 0
     assert run["summary"]["analysis_mode"] == "ast-local"
 
 
@@ -122,6 +126,10 @@ def test_copilot_returns_citations(tmp_path: Path) -> None:
     payload = response.json()
     assert "impact" in payload["answer"].lower()
     assert len(payload["citations"]) >= 1
+    assert "risk_implications" in payload
+    assert isinstance(payload["risk_implications"], list)
+    assert "related_nodes" in payload
+    assert isinstance(payload["related_nodes"], list)
 
 
 def test_mcp_status_endpoint_exposes_server_names_without_secrets() -> None:

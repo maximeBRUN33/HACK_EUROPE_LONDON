@@ -47,10 +47,38 @@ export function CopilotPanel({ runId, response, isBusy, onAsk }: CopilotPanelPro
           <ul className="citation-list">
             {response.citations.map((citation) => (
               <li key={`${citation.file_path}-${citation.symbol}`}>
-                <code>{citation.file_path}</code> | <code>{citation.symbol}</code> | {citation.reason}
+                <code>{citation.file_path}</code>
+                {citation.line_start != null && (
+                  <span className="citation-lines">
+                    L{citation.line_start}{citation.line_end != null && citation.line_end !== citation.line_start ? `\u2013${citation.line_end}` : ""}
+                  </span>
+                )}
+                {" | "}<code>{citation.symbol}</code>{" | "}{citation.reason}
               </li>
             ))}
           </ul>
+
+          {response.risk_implications.length > 0 && (
+            <>
+              <h3>Risk Implications</h3>
+              <ul className="implication-list">
+                {response.risk_implications.map((item, idx) => (
+                  <li key={idx} className="implication-item">{item}</li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {response.related_nodes.length > 0 && (
+            <>
+              <h3>Related Nodes</h3>
+              <div className="related-nodes">
+                {response.related_nodes.map((nodeId) => (
+                  <span key={nodeId} className="node-pill process">{nodeId}</span>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
     </section>
