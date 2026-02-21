@@ -103,30 +103,23 @@ class DustClient:
         last_payload: dict = {}
 
         while time.time() < deadline:
-            payload = self._poll_events(conversation_id=conversation_id, message_id=message_id)
+            payload = self._get_conversation(conversation_id=conversation_id)
             last_payload = payload
 
-            text = _extract_text_from_events(payload)
+            text = _extract_text_from_conversation(payload)
             if text:
                 return text
 
             time.sleep(1.0)
 
-        fallback_text = _extract_text_from_events(last_payload)
+        fallback_text = _extract_text_from_conversation(last_payload)
         if fallback_text:
             return fallback_text
 
         raise RuntimeError("Dust response timeout")
 
-    def _poll_events(self, conversation_id: str, message_id: str | None) -> dict:
-        if message_id:
-            url = f"{self.base_url}/w/{self.workspace_id}/assistant/conversations/{conversation_id}/messages/{message_id}/events"
-            try:
-                return self._request_json(method="GET", url=url)
-            except RuntimeError:
-                pass
-
-        url = f"{self.base_url}/w/{self.workspace_id}/assistant/conversations/{conversation_id}/events"
+    def _get_conversation(self, conversation_id: str) -> dict:
+        url = f"{self.base_url}/w/{self.workspace_id}/assistant/conversations/{conversation_id}"
         return self._request_json(method="GET", url=url)
 
     def _request_json(self, method: str, url: str, payload: dict | None = None) -> dict:
@@ -161,33 +154,27 @@ def _first_non_empty(*values: object) -> str | None:
     return None
 
 
-def _extract_text_from_events(payload: dict) -> str:
-    events = payload.get("events")
-    if not isinstance(events, list):
-        events = [payload]
+def _extract_text_from_conversation(payload: dict) -> str:
+    conversation = payload.get("conversation")
+    if not isinstance(conversation, dict):
+        return ""
+
+    content = conversation.get("content")
+    if not isinstance(content, list):
+        return ""
 
     candidates: list[str] = []
-
-    for event in events:
-        if not isinstance(event, dict):
+    for branch in content:
+        if not isinstance(branch, list):
             continue
-
-        for key in ("answer", "text", "content"):
-            value = event.get(key)
-            if isinstance(value, str) and value.strip():
-                candidates.append(value.strip())
-
-        message = event.get("message")
-        if isinstance(message, dict):
-            for key in ("content", "text"):
-                value = message.get(key)
-                if isinstance(value, str) and value.strip():
-                    candidates.append(value.strip())
-
-        if isinstance(event.get("payload"), dict):
-            payload_text = event["payload"].get("text")
-            if isinstance(payload_text, str) and payload_text.strip():
-                candidates.append(payload_text.strip())
+        for message in branch:
+            if not isinstance(message, dict):
+                continue
+            if message.get("type") != "agent_message":
+                continue
+            text = message.get("content")
+            if isinstance(text, str) and text.strip():
+                candidates.append(text.strip())
 
     return candidates[-1] if candidates else ""
 

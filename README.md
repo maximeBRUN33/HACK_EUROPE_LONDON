@@ -10,6 +10,13 @@ This repository now contains the first implementation slice:
 
 ## Quick start
 
+### 0) Create env files
+
+```bash
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env
+```
+
 ### 1) Run API
 
 ```bash

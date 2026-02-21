@@ -4,6 +4,7 @@
 
 ```bash
 cd apps/api
+cp .env.example .env
 pip install -e .
 uvicorn app.main:app --reload --port 8000
 ```

@@ -37,9 +37,20 @@ class CodeWordsClient:
             raise RuntimeError("CodeWords runtime not configured")
 
         route = "run_async" if async_mode else "run"
-        url = f"{self.base_url}/{route}/{service_id}"
-        payload = {"inputs": inputs}
-        raw = self._post_json(url, payload)
+        base_url = f"{self.base_url}/{route}/{service_id}"
+        url = base_url if base_url.endswith("/") else f"{base_url}/"
+
+        raw: dict
+        try:
+            # Primary format: services like devx_mcp expect direct body fields.
+            raw = self._post_json(url, inputs)
+        except RuntimeError as exc:
+            text = str(exc).lower()
+            needs_inputs_wrapper = "body" in text and "inputs" in text and "field required" in text
+            if not needs_inputs_wrapper:
+                raise
+            # Compatibility format for services that expect {"inputs": {...}}.
+            raw = self._post_json(url, {"inputs": inputs})
 
         request_id = (
             raw.get("request_id")
