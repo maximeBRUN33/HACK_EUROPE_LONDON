@@ -5,7 +5,6 @@
 > Built for the [{Tech: Europe} London Hackathon](https://techeurope.io) — Conduct Track
 
 ![HomePage](docs/assets/homepage.jpeg)
-
 ---
 
 ## The Problem
@@ -29,7 +28,7 @@ Point it at a Python codebase and get four things back:
 GitHub repo → Clone locally → Parse Python AST → Build workflow/lineage/risk graphs → AI semantic enrichment → Interactive UI
 
 1. **Deterministic analysis first** — Python AST parsing extracts every function, class, import, call graph, entity, and CRUD operation. No AI hallucinations in the structural layer.
-2. **AI interpretation second** — Dust agents label technical code clusters as business workflows and power the copilot with cited answers.
+2. **AI interpretation second** — Dust powers grounded copilot answers and CodeWords enrichment adds ontology and migration hints.
 3. **Every claim is traceable** — click any node and see the exact file, function, and line number.
 
 ## Partner Technologies
@@ -183,6 +182,7 @@ make api-smoke                      # Backend smoke flow (no frontend required)
 | `LEGACY_ATLAS_CODEWORDS_RUNTIME_HOOK` | Set to `0` to disable post-analysis CodeWords trigger/poll |
 | `LEGACY_ATLAS_LOG_LEVEL` | Runtime logging level (`DEBUG`, `INFO`, `WARNING`, ...) |
 | `LEGACY_ATLAS_AST_PROGRESS_EVERY` | Log AST scan progress every N Python files |
+| `LEGACY_ATLAS_CORS_ORIGINS` | Comma-separated CORS allowlist (default localhost web dev ports) |
 
 To watch analysis internals live in terminal, start API with:
 
@@ -198,7 +198,7 @@ pip install -e .[dev]
 pytest
 ```
 
-22 tests covering health check, end-to-end scan + graph generation, migration blueprint endpoint, manual API flow parity, Dust fallback matrix, copilot paths, ingestion branch resolution, API error detail codes, MCP/Dust status, integrations readiness, and fallback mode.
+The test suite covers health check, end-to-end scan + graph generation, migration blueprint endpoint, manual API flow parity, Dust fallback matrix, copilot paths, ingestion branch resolution, API error detail codes, MCP/Dust status, integrations readiness, and fallback mode.
 
 ## Repository Structure
 ```
@@ -206,7 +206,7 @@ apps/
   api/                  # FastAPI backend (Python 3.12)
     app/
       routers/          # API endpoint handlers
-      services/         # Analysis engine, Dust client, CodeWords client
+      services/         # Analysis engine, Dust client, Gemini client, CodeWords client
       persistence/      # SQLite storage layer
       integrations/     # MCP configuration
     tests/              # Integration tests
@@ -214,8 +214,6 @@ apps/
     src/
       components/       # UI panels (Graph, Risk, Copilot, Intake)
       lib/              # API client and types
-legacy-atlas-plan/      # Planning docs and execution playbooks
-dust-integration/       # Dust agent configs and MCP references
 ```
 
 ## Post-Hackathon Roadmap

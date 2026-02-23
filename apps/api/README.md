@@ -74,6 +74,7 @@ If no local path is available, the API returns fallback synthetic artifacts.
 - `LEGACY_ATLAS_SYNC_JOBS`: `1` to execute scans inline (test mode).
 - `LEGACY_ATLAS_LOG_LEVEL`: runtime logging level (`DEBUG`, `INFO`, `WARNING`, ...).
 - `LEGACY_ATLAS_AST_PROGRESS_EVERY`: log AST parser progress every N scanned Python files.
+- `LEGACY_ATLAS_CORS_ORIGINS`: comma-separated CORS allowlist (default localhost web dev ports).
 - `LEGACY_ATLAS_CODEWORDS_RUNTIME_HOOK`: `1` (default) to trigger/poll CodeWords runtime after analysis, `0` to disable.
 - `CODEWORDS_RUNTIME_BASE_URL`: defaults to MCP CodeWords URL when available.
 - `CODEWORDS_API_KEY`: overrides MCP token fallback.

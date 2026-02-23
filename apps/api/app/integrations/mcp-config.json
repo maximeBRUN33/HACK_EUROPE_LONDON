@@ -8,15 +8,6 @@
       "headers": {
         "Authorization": "Bearer ${CODEWORDS_API_KEY}"
       }
-    },
-    "lovable-mcp-server": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "lovable-mcp-server",
-        "--project-path",
-        "/Users/maximebrun/Documents/2-Areas/DVP - Développement Perso/HACK_EUROPE_LONDON/apps/web"
-      ]
     }
   }
 }

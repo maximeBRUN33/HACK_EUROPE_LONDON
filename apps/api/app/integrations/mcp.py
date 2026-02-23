@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-DEFAULT_MCP_CONFIG = Path(__file__).resolve().parents[4] / "dust-integration" / "references" / "mcp-config.json"
+DEFAULT_MCP_CONFIG = Path(__file__).resolve().parent / "mcp-config.json"
 
 
 def load_mcp_config(path: Path | None = None) -> dict[str, Any]:
